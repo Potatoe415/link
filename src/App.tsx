@@ -46,7 +46,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedEngines, setSelectedEngines] = useState<string[]>(ENGINES.map(e => e.id));
+  const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2']);
   const [sortBy, setSortBy] = useState<SortOption>('seeders');
   const [currentPage, setCurrentPage] = useState(1);
   
