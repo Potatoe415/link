@@ -19,7 +19,6 @@ const cleanTitle = (str) => {
   try {
       let decoded = he.decode(he.decode(str));
       decoded = decoded.replace(/[\n\r\t]/g, ' ').replace(/\s\s+/g, ' ').trim();
-      // Safety: If it starts with magnet:, it's not a title
       if (decoded.startsWith('magnet:?')) return '';
       return decoded;
   } catch (e) {
@@ -30,37 +29,42 @@ const cleanTitle = (str) => {
 const parseDate = (dateStr) => {
     if (!dateStr) return { display: 'N/A', timestamp: 0 };
     const now = new Date();
-    let d = new Date(dateStr);
+    const s = dateStr.toLowerCase().trim();
+    let d = new Date(s);
 
-    if (!isNaN(dateStr) && !isNaN(parseFloat(dateStr))) {
-        d = new Date(parseInt(dateStr));
+    // If it's a number (timestamp)
+    if (!isNaN(s) && !isNaN(parseFloat(s))) {
+        d = new Date(parseInt(s));
     } 
-    else if (dateStr.toLowerCase().includes('ago')) {
-        const parts = dateStr.toLowerCase().split(' ');
-        const num = parseInt(parts[0]);
+    // Handle relative dates like "2 days ago", "5 hours", "1 month"
+    else if (s.includes('day') || s.includes('hour') || s.includes('min') || s.includes('month') || s.includes('year') || s.includes('week')) {
+        const num = parseInt(s.match(/\d+/)?.[0]);
         if (!isNaN(num)) {
-            if (parts[1].includes('min')) d = new Date(now.getTime() - num * 60000);
-            else if (parts[1].includes('hour')) d = new Date(now.getTime() - num * 3600000);
-            else if (parts[1].includes('day')) d = new Date(now.getTime() - num * 86400000);
-            else if (parts[1].includes('week')) d = new Date(now.getTime() - num * 604800000);
-            else if (parts[1].includes('month')) d = new Date(now.getTime() - num * 2592000000);
-            else if (parts[1].includes('year')) d = new Date(now.getTime() - num * 31536000000);
+            if (s.includes('min')) d = new Date(now.getTime() - num * 60000);
+            else if (s.includes('hour')) d = new Date(now.getTime() - num * 3600000);
+            else if (s.includes('day')) d = new Date(now.getTime() - num * 86400000);
+            else if (s.includes('week')) d = new Date(now.getTime() - num * 604800000);
+            else if (s.includes('month')) d = new Date(now.getTime() - num * 2592000000);
+            else if (s.includes('year')) d = new Date(now.getTime() - num * 31536000000);
         }
     }
-    else if (dateStr.toLowerCase() === 'today') d = now;
-    else if (dateStr.toLowerCase() === 'yesterday') d = new Date(now.getTime() - 86400000);
+    else if (s === 'today') d = now;
+    else if (s === 'yesterday') d = new Date(now.getTime() - 86400000);
     else if (isNaN(d.getTime())) {
-        const fixedYear = dateStr.replace(/'(\d{2})/, '20$1');
+        const fixedYear = s.replace(/'(\d{2})/, '20$1');
         d = new Date(fixedYear);
     }
 
     if (isNaN(d.getTime())) return { display: dateStr, timestamp: 0 };
-    return { display: d.toISOString().split('T')[0], timestamp: d.getTime() };
+    return { 
+        display: d.toISOString().split('T')[0], 
+        timestamp: d.getTime() 
+    };
 };
 
 const parseSizeBytes = (sizeStr) => {
     if (!sizeStr) return 0;
-    const s = sizeStr.toLowerCase();
+    const s = sizeStr.toLowerCase().replace(/,/g, '');
     const val = parseFloat(s);
     if (s.includes('gb') || s.includes('go') || s.includes('gib')) return val * 1024 * 1024 * 1024;
     if (s.includes('mb') || s.includes('mo') || s.includes('mib')) return val * 1024 * 1024;
@@ -75,7 +79,6 @@ const COMMON_HEADERS = {
   'Referer': 'https://www.google.com/'
 };
 
-// Standard public trackers to make magnet links work instantly
 const TRACKERS = [
     'udp://tracker.opentrackr.org:1337/announce',
     'udp://open.stealth.si:80/announce',
@@ -109,14 +112,13 @@ const engines = {
     const mirrors = [
         'https://tpb.party',
         'https://thepiratebay10.org',
-        'https://piratebayproxy.net',
-        'https://thepiratebay.zone'
+        'https://piratebayproxy.net'
     ];
 
     for (const mirror of mirrors) {
         try {
             const url = `${mirror}/search/${encodeURIComponent(q)}/1/99/0`;
-            const proxyResp = await axios.get(url, { timeout: 5000, headers: COMMON_HEADERS });
+            const proxyResp = await axios.get(url, { timeout: 6000, headers: COMMON_HEADERS });
             const $ = cheerio.load(proxyResp.data);
             const results = [];
             $('table#searchResult tr').each((i, el) => {
@@ -126,10 +128,15 @@ const engines = {
                 const magnetUrl = $(el).find('a[href^="magnet:"]').attr('href');
                 const seeders = parseInt($(el).find('td:nth-last-child(2)').text()) || 0;
                 const descText = $(el).find('font.detDesc, .detDesc').text();
-                const sizeMatch = descText.match(/Size ([\d.]+\s+[KMG]iB)/i);
+                
+                // Better regex for size and date
+                const sizeMatch = descText.match(/Size\s+([\d.]+\s+[A-Z]+i?B)/i);
                 const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : 'N/A';
-                const dateMatch = descText.match(/Uploaded ([\d-]+)/i);
-                const { display, timestamp } = parseDate(dateMatch ? dateMatch[1] : null);
+                
+                const dateMatch = descText.match(/Uploaded\s+([\d\s-:]+)/i);
+                const rawDate = dateMatch ? dateMatch[1].split(',')[0] : null;
+                const { display, timestamp } = parseDate(rawDate);
+
                 if (title && magnetUrl && title.length > 2) {
                     results.push({
                         title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
@@ -259,16 +266,12 @@ const engines = {
         $('div.results dl').each((i, el) => {
             const linkEl = $(el).find('dt a');
             const title = cleanTitle(linkEl.text());
-            
-            // Extract hash from href which is usually /hash or hash
             let href = linkEl.attr('href') || "";
-            const hash = href.split('/').pop(); // Get last part
-
+            const hash = href.split('/').pop();
             const sizeStr = $(el).find('span.s').text().trim();
             const seeders = parseInt($(el).find('span.u').text()) || 0;
             const rawDate = $(el).find('span.d').text().trim();
             const { display, timestamp } = parseDate(rawDate);
-            
             if (title && hash && hash.length > 20) {
                 results.push({
                     title, magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
