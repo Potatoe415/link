@@ -262,25 +262,36 @@ const engines = {
     try {
         const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
-        const results = [];
+        const links = [];
         $(config.selectors.rows).each((i, el) => {
             const linkEl = $(el).find(config.selectors.title);
             const title = cleanTitle(linkEl.text());
-            let href = linkEl.attr('href') || "";
-            const hash = href.split('/').pop();
+            const href = linkEl.attr('href') || '';
+            const detailUrl = href ? config.urls.base + href : null;
             const sizeStr = $(el).find(config.selectors.size).text().trim();
             const seeders = parseInt($(el).find(config.selectors.seeders).text()) || 0;
             const rawDate = $(el).find(config.selectors.date).text().trim();
             const { display, timestamp } = parseDate(rawDate);
-            if (title && hash && hash.length > 20) {
-                results.push({
-                    title, magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
-                    size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
-                    seeders, date: display, timestamp, source: 'Torrentz2'
-                });
-            }
+            if (title && detailUrl) links.push({ title, detailUrl, sizeStr, seeders, display, timestamp });
         });
-        return results;
+        // Fetch detail pages in parallel to get the real magnet link (truncated ID in URL ≠ full info_hash)
+        const settled = await Promise.all(links.slice(0, 5).map(async (link) => {
+            try {
+                const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
+                const $$ = cheerio.load(detailResp.data);
+                const magnetUrl = $$(config.selectors.magnet).first().attr('href');
+                if (magnetUrl && magnetUrl.startsWith('magnet:?xt=urn:btih:')) {
+                    return {
+                        title: link.title, magnetUrl: magnetUrl + TRACKERS,
+                        size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                        seeders: link.seeders, date: link.display, timestamp: link.timestamp,
+                        source: 'Torrentz2'
+                    };
+                }
+            } catch (e) {}
+            return null;
+        }));
+        return settled.filter(Boolean);
     } catch (e) { return []; }
   },
   kickass: async (q) => {

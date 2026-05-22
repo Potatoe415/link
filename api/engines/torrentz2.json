@@ -3,11 +3,13 @@
   "name": "Torrentz2",
   "type": "scraper",
   "urls": {
-    "primary": "https://torrentz2.nz/search?q={{q}}"
+    "primary": "https://torrentz2.nz/search?q={{q}}",
+    "base": "https://torrentz2.nz"
   },
   "selectors": {
     "rows": "div.results dl",
     "title": "dt a",
+    "magnet": "a[href^=\"magnet:\"]",
     "size": "span.s",
     "seeders": "span.u",
     "date": "span.d"
