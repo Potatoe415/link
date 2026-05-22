@@ -134,16 +134,12 @@ function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 font-sans text-white">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl text-center relative overflow-hidden">
-          {/* Subtle decoration */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
-          
           <div className="inline-flex p-4 rounded-full bg-blue-600/10 text-blue-500 mb-6">
             <Lock size={32} />
           </div>
-          
           <h1 className="text-3xl font-bold mb-2 tracking-tight">Access <span className="text-blue-500">Locked</span></h1>
           <p className="text-slate-400 mb-8 text-sm">Please enter the security password</p>
-          
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="password"
@@ -219,12 +215,10 @@ function App() {
           >
             <ChevronLeft size={24} />
           </button>
-          
           <div className="text-sm font-medium text-slate-300 px-2">
             Page <span className="text-blue-500 font-bold">{currentPage}</span> / {totalPages}
             <span className="ml-2 text-slate-500 hidden sm:inline">({results.length} total)</span>
           </div>
-
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
@@ -272,7 +266,7 @@ function App() {
         >
           <div className="flex items-center gap-2 text-slate-300 font-medium text-xs sm:text-sm">
             <Terminal size={14} className="text-blue-500 sm:w-4 sm:h-4" />
-            <span>DEBUG CONSOLE</span>
+            <span>DEBUG</span>
             {debugInfo && (
               <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 bg-slate-700 rounded text-[10px] sm:text-xs text-slate-400">
                 {debugInfo.totalTime}ms
@@ -282,36 +276,26 @@ function App() {
           {isDebugOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>
         
-        <div className="p-3 sm:p-4 h-[calc(70vh-40px)] sm:h-52 overflow-y-auto font-mono text-[10px] sm:text-xs">
+        <div className="p-2 sm:p-3 h-[calc(70vh-40px)] sm:h-52 overflow-y-auto font-mono text-[10px] sm:text-xs">
           {!debugInfo ? (
             <p className="text-slate-500 italic text-center mt-6 sm:mt-10">No search logs yet.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3">
+            <div className="flex flex-col gap-1">
               {debugInfo.logs.map((log, i) => (
-                <div key={i} className={`p-2.5 sm:p-3 rounded-lg border ${log.status === 'success' ? 'bg-emerald-950/20 border-emerald-900/30' : 'bg-red-950/20 border-red-900/30'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-200 uppercase tracking-tight truncate mr-2">{log.engine}</span>
-                    <span className={`px-1 py-0.5 rounded text-[8px] sm:text-[10px] uppercase font-bold shrink-0 ${log.status === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-                      {log.status}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-0.5 sm:gap-1 text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <Activity size={10} />
-                      <span>{log.time}ms</span>
-                    </div>
+                <div key={i} className={`px-3 py-1 rounded-lg border flex items-center justify-between gap-2 ${log.status === 'success' ? 'bg-emerald-950/10 border-emerald-900/20' : 'bg-red-950/10 border-red-900/20'}`}>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="font-bold text-slate-200 uppercase tracking-tight shrink-0 w-20 truncate">{log.engine}</span>
+                    <span className="text-slate-500 shrink-0 text-[9px]">{log.time}ms</span>
+                    <div className="h-3 w-px bg-slate-700 shrink-0"></div>
                     {log.status === 'success' ? (
-                      <div className="flex items-center gap-1.5 text-emerald-400/80">
-                        <Check size={10} />
-                        <span>Found: {log.count} items</span>
-                      </div>
+                      <span className="text-emerald-400/80 truncate font-medium">{log.count} items</span>
                     ) : (
-                      <div className="flex items-center gap-1.5 text-red-400/80">
-                        <AlertCircle size={10} />
-                        <span className="truncate" title={log.error}>{log.error}</span>
-                      </div>
+                      <span className="text-red-400/80 truncate font-medium" title={log.error}>{log.error}</span>
                     )}
                   </div>
+                  <span className={`px-1 py-0.5 rounded text-[7px] uppercase font-bold shrink-0 ${log.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {log.status === 'success' ? 'OK' : 'ERR'}
+                  </span>
                 </div>
               ))}
             </div>
