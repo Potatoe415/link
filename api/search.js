@@ -25,15 +25,44 @@ const cleanTitle = (str) => {
   }
 };
 
-const formatDate = (dateInput) => {
-    if (!dateInput) return { display: 'N/A', timestamp: 0 };
-    try {
-        const d = new Date(dateInput);
-        if (isNaN(d.getTime())) return { display: dateInput, timestamp: 0 };
-        return { display: d.toISOString().split('T')[0], timestamp: d.getTime() };
-    } catch (e) {
-        return { display: dateInput, timestamp: 0 };
+const parseDate = (dateStr) => {
+    if (!dateStr) return { display: 'N/A', timestamp: 0 };
+    const now = new Date();
+    let d = new Date(dateStr);
+
+    // If it's a number (timestamp)
+    if (!isNaN(dateStr) && !isNaN(parseFloat(dateStr))) {
+        d = new Date(parseInt(dateStr));
+    } 
+    // Handle relative dates like "2 days ago", "5 hours ago", "1 month ago"
+    else if (dateStr.toLowerCase().includes('ago')) {
+        const parts = dateStr.toLowerCase().split(' ');
+        const num = parseInt(parts[0]);
+        if (!isNaN(num)) {
+            if (parts[1].includes('min')) d = new Date(now.getTime() - num * 60000);
+            else if (parts[1].includes('hour')) d = new Date(now.getTime() - num * 3600000);
+            else if (parts[1].includes('day')) d = new Date(now.getTime() - num * 86400000);
+            else if (parts[1].includes('week')) d = new Date(now.getTime() - num * 604800000);
+            else if (parts[1].includes('month')) d = new Date(now.getTime() - num * 2592000000);
+            else if (parts[1].includes('year')) d = new Date(now.getTime() - num * 31536000000);
+        }
     }
+    // Handle "today" or "yesterday"
+    else if (dateStr.toLowerCase() === 'today') d = now;
+    else if (dateStr.toLowerCase() === 'yesterday') d = new Date(now.getTime() - 86400000);
+    // Handle short formats like "May '24" or "May 22"
+    else if (isNaN(d.getTime())) {
+        // Try to replace ' with 20 to handle '24 -> 2024
+        const fixedYear = dateStr.replace(/'(\d{2})/, '20$1');
+        d = new Date(fixedYear);
+    }
+
+    if (isNaN(d.getTime())) return { display: dateStr, timestamp: 0 };
+    
+    return { 
+        display: d.toISOString().split('T')[0], 
+        timestamp: d.getTime() 
+    };
 };
 
 const parseSizeBytes = (sizeStr) => {
@@ -55,7 +84,6 @@ const COMMON_HEADERS = {
 
 const engines = {
   apibay: async (q) => {
-    // 1. Try official Apibay API
     try {
         const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 4000, headers: COMMON_HEADERS });
         if (Array.isArray(resp.data) && resp.data.length > 0 && resp.data[0].id !== "0") {
@@ -63,7 +91,7 @@ const engines = {
                 .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
                 .map(item => {
                     const title = cleanTitle(item.name);
-                    const { display, timestamp } = formatDate(item.added ? parseInt(item.added) * 1000 : null);
+                    const { display, timestamp } = parseDate(item.added ? parseInt(item.added) * 1000 : null);
                     return {
                         title, magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}`,
                         size: formatSize(item.size), sizeBytes: parseInt(item.size) || 0,
@@ -73,12 +101,10 @@ const engines = {
         }
     } catch (e) {}
 
-    // 2. Mirror list (Proxy Scraping)
     const mirrors = [
         'https://tpb.party',
         'https://thepiratebay10.org',
-        'https://piratebayproxy.net',
-        'https://thepiratebay.zone'
+        'https://piratebayproxy.net'
     ];
 
     for (const mirror of mirrors) {
@@ -87,7 +113,6 @@ const engines = {
             const proxyResp = await axios.get(url, { timeout: 6000, headers: COMMON_HEADERS });
             const $ = cheerio.load(proxyResp.data);
             const results = [];
-            
             $('table#searchResult tr').each((i, el) => {
                 if (i === 0) return;
                 const linkEl = $(el).find('div.detName a');
@@ -95,13 +120,10 @@ const engines = {
                 const magnetUrl = $(el).find('a[href^="magnet:"]').attr('href');
                 const seeders = parseInt($(el).find('td:nth-last-child(2)').text()) || 0;
                 const descText = $(el).find('font.detDesc').text();
-                
                 const sizeMatch = descText.match(/Size ([\d.]+\s+[KMG]iB)/i);
                 const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : 'N/A';
-                
                 const dateMatch = descText.match(/Uploaded ([\d-]+)/i);
-                const { display, timestamp } = formatDate(dateMatch ? dateMatch[1] : null);
-
+                const { display, timestamp } = parseDate(dateMatch ? dateMatch[1] : null);
                 if (title && magnetUrl && title !== 'Unknown Title') {
                     results.push({
                         title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
@@ -109,11 +131,8 @@ const engines = {
                     });
                 }
             });
-
             if (results.length > 0) return results;
-        } catch (e) {
-            continue;
-        }
+        } catch (e) { continue; }
     }
     return [];
   },
@@ -127,7 +146,7 @@ const engines = {
             const magnetUrl = $(el).find('td.tdnormal:nth-of-type(3) a.csbuttons[href^="magnet:"]').attr('href');
             const sizeStr = $(el).find('td.tdnormal:nth-of-type(2)').text().trim();
             const rawDate = $(el).find('td.tdnormal:nth-of-type(1)').text().trim().split(' - ')[0];
-            const { display, timestamp } = formatDate(rawDate);
+            const { display, timestamp } = parseDate(rawDate);
             const seeders = parseInt($(el).find('td.tdseed').text().trim()) || 0;
             if (title && magnetUrl && title !== 'Unknown Title') {
                 results.push({ 
@@ -147,7 +166,7 @@ const engines = {
         resp.data.data.movies.forEach(movie => {
             movie.torrents.forEach(t => {
                 const title = cleanTitle(`${movie.title_long} [${t.quality}] [${t.type}]`);
-                const { display, timestamp } = formatDate(movie.date_uploaded);
+                const { display, timestamp } = parseDate(movie.date_uploaded);
                 results.push({
                     title, magnetUrl: `magnet:?xt=urn:btih:${t.hash}&dn=${encodeURIComponent(title)}`,
                     size: t.size, sizeBytes: t.size_bytes || parseSizeBytes(t.size),
@@ -162,7 +181,7 @@ const engines = {
     try {
         const resp = await axios.get(`https://solidtorrents.net/api/v1/search?q=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
         return (resp.data.results || []).map(item => {
-            const { display, timestamp } = formatDate(item.createdAt);
+            const { display, timestamp } = parseDate(item.createdAt);
             const title = cleanTitle(item.title);
             return {
                 title, magnetUrl: item.magnet, size: formatSize(item.size), sizeBytes: item.size || 0,
@@ -181,7 +200,7 @@ const engines = {
             const magnetUrl = $(el).find('td:nth-child(3) a[href^="magnet:"]').attr('href');
             const sizeStr = $(el).find('td:nth-child(4)').text().trim();
             const rawDate = $(el).find('td:nth-child(5)').text().trim().split(' ')[0];
-            const { display, timestamp } = formatDate(rawDate);
+            const { display, timestamp } = parseDate(rawDate);
             const seeders = parseInt($(el).find('td:nth-child(6)').text().trim()) || 0;
             if (title && magnetUrl && title !== 'Unknown Title') {
                 results.push({ 
@@ -214,7 +233,7 @@ const engines = {
                 const $$ = cheerio.load(detailResp.data);
                 const magnetUrl = $$('a[href^="magnet:"]').first().attr('href');
                 const fullDate = $$('.list-inline li:contains("Date uploaded")').text().replace("Date uploaded", "").trim() || link.rawDate;
-                const { display, timestamp } = formatDate(fullDate);
+                const { display, timestamp } = parseDate(fullDate);
                 if (magnetUrl) {
                     results.push({ 
                         title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
@@ -237,7 +256,7 @@ const engines = {
             const sizeStr = $(el).find('span.s').text().trim();
             const seeders = parseInt($(el).find('span.u').text()) || 0;
             const rawDate = $(el).find('span.d').text().trim();
-            const { display, timestamp } = formatDate(rawDate);
+            const { display, timestamp } = parseDate(rawDate);
             if (title && hash) {
                 results.push({
                     title, magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}`,
@@ -259,7 +278,7 @@ const engines = {
             const magnetUrl = $(el).find('a[title="Torrent magnet link"]').attr('href');
             const sizeStr = $(el).find('td:nth-child(2)').text().trim();
             const rawDate = $(el).find('td:nth-child(4)').text().trim();
-            const { display, timestamp } = formatDate(rawDate);
+            const { display, timestamp } = parseDate(rawDate);
             const seeders = parseInt($(el).find('td:nth-child(5)').text()) || 0;
             if (title && magnetUrl) {
                 results.push({
@@ -280,7 +299,7 @@ const engines = {
             const title = cleanTitle($(el).find('h1.entry-title a').text());
             const magnetUrl = $(el).find('a[href^="magnet:"]').first().attr('href');
             const rawDate = $(el).find('time.entry-date').attr('datetime');
-            const { display, timestamp } = formatDate(rawDate);
+            const { display, timestamp } = parseDate(rawDate);
             if (title && magnetUrl) {
                 results.push({
                     title, magnetUrl, size: 'Game Repack', sizeBytes: 0,
@@ -311,7 +330,7 @@ const engines = {
                 const $$ = cheerio.load(detailResp.data);
                 const magnetUrl = $$('a[href^="magnet:"]').attr('href');
                 const rawDate = $$('.start-session').text().split(':').pop().trim();
-                const { display, timestamp } = formatDate(rawDate);
+                const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {
                     results.push({ 
                         title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
