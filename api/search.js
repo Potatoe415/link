@@ -35,20 +35,23 @@ const parseDate = (dateStr) => {
 
     if (!isNaN(s) && !isNaN(parseFloat(s))) {
         d = new Date(parseInt(s));
-    } 
-    else if (s.includes('day') || s.includes('hour') || s.includes('min') || s.includes('month') || s.includes('year') || s.includes('week')) {
-        const num = parseInt(s.match(/\d+/)?.[0]);
-        if (!isNaN(num)) {
-            if (s.includes('min')) d = new Date(now.getTime() - num * 60000);
-            else if (s.includes('hour')) d = new Date(now.getTime() - num * 3600000);
-            else if (s.includes('day')) d = new Date(now.getTime() - num * 86400000);
-            else if (s.includes('week')) d = new Date(now.getTime() - num * 604800000);
-            else if (s.includes('month')) d = new Date(now.getTime() - num * 2592000000);
-            else if (s.includes('year')) d = new Date(now.getTime() - num * 31536000000);
-        }
     }
     else if (s === 'today') d = now;
     else if (s === 'yesterday') d = new Date(now.getTime() - 86400000);
+    else {
+        // Match both abbreviated ("7y ago", "3mo ago", "5d ago") and full ("5 days", "2 hours ago")
+        const relMatch = s.match(/(\d+)\s*(y(?:r|ear)?s?|mo(?:nth)?s?|w(?:k|eek)?s?|d(?:ay)?s?|h(?:r|our)?s?|min(?:ute)?s?)/);
+        if (relMatch) {
+            const num = parseInt(relMatch[1]);
+            const unit = relMatch[2];
+            if (/^y/.test(unit))   d = new Date(now.getTime() - num * 31536000000);
+            else if (/^mo/.test(unit)) d = new Date(now.getTime() - num * 2592000000);
+            else if (/^w/.test(unit))  d = new Date(now.getTime() - num * 604800000);
+            else if (/^d/.test(unit))  d = new Date(now.getTime() - num * 86400000);
+            else if (/^h/.test(unit))  d = new Date(now.getTime() - num * 3600000);
+            else if (/^mi/.test(unit)) d = new Date(now.getTime() - num * 60000);
+        }
+    }
     else if (isNaN(d.getTime())) {
         const fixedYear = s.replace(/'(\d{2})/, '20$1');
         d = new Date(fixedYear);
