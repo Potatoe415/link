@@ -99,7 +99,6 @@ function App() {
         <h1 className="text-4xl sm:text-5xl font-bold mb-2 sm:mb-4 tracking-tight">
           Magnet<span className="text-blue-500">Finder</span>
         </h1>
-        <p className="text-slate-400 text-base sm:text-lg">Ultra-light torrent search tool</p>
       </header>
 
       <SearchBar onSearch={handleSearch} isLoading={loading} />

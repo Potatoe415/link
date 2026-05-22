@@ -15,7 +15,10 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, onDownload }) => {
   };
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 p-3 sm:p-4 rounded-xl flex items-center justify-between hover:bg-slate-800 transition-colors group gap-2 sm:gap-4 w-full">
+    <div 
+      onClick={() => onDownload(result.magnetUrl)}
+      className="bg-slate-800/50 border border-slate-700 p-3 sm:p-4 rounded-xl flex items-center justify-between hover:bg-slate-800 transition-colors group gap-2 sm:gap-4 w-full cursor-pointer active:scale-[0.98] sm:active:scale-100"
+    >
       <div className="flex-1 min-w-0">
         <h3 className="text-white text-sm sm:text-base font-medium truncate mb-1" title={result.title}>
           {result.title}
@@ -36,14 +39,17 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, onDownload }) => {
           <span className="bg-slate-700 px-1.5 py-0.5 rounded text-[10px] sm:text-xs truncate max-w-[80px] sm:max-w-none text-slate-300">{result.source}</span>
         </div>
       </div>
-      <button
-        onClick={() => onDownload(result.magnetUrl)}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white p-2.5 sm:px-4 sm:py-2 rounded-lg transition-colors shrink-0 shadow-lg active:scale-95"
-        title="Download Magnet"
-      >
+      
+      {/* Hidden on mobile, visible on desktop */}
+      <div className="hidden sm:flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-colors shrink-0 shadow-lg active:scale-95">
         <Magnet size={18} />
-        <span className="hidden sm:inline font-semibold text-sm">Download</span>
-      </button>
+        <span className="font-semibold text-sm">Download</span>
+      </div>
+
+      {/* Mobile-only subtle indicator (optional, but good for UX) */}
+      <div className="sm:hidden text-blue-500">
+        <Magnet size={20} />
+      </div>
     </div>
   );
 };
