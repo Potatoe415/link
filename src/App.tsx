@@ -83,30 +83,41 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen pb-20 p-8 flex flex-col items-center bg-slate-900 text-white">
-      <header className="mb-12 text-center relative w-full max-w-2xl">
-        <h1 className="text-5xl font-bold mb-4 tracking-tight">
+    <div className="min-h-screen pb-20 p-4 sm:p-8 flex flex-col items-center bg-slate-900 text-white font-sans">
+      <header className="mb-8 sm:mb-12 text-center w-full max-w-2xl">
+        <h1 className="text-4xl sm:text-5xl font-bold mb-2 sm:mb-4 tracking-tight">
           Magnet<span className="text-blue-500">Finder</span>
         </h1>
-        <p className="text-slate-400 text-lg">Ultra-light torrent search tool</p>
-        
-        <button 
-          onClick={() => setShowSettings(!showSettings)}
-          className="absolute right-0 top-0 p-2 text-slate-400 hover:text-white transition-colors"
-          title="Search Settings"
-        >
-          <Settings size={28} />
-        </button>
+        <p className="text-slate-400 text-base sm:text-lg">Ultra-light torrent search tool</p>
+      </header>
 
+      <SearchBar onSearch={handleSearch} isLoading={loading} />
+
+      {error && (
+        <div className="mt-8 p-4 bg-red-900/30 border border-red-800 text-red-400 rounded-lg text-sm sm:text-base">
+          {error}
+        </div>
+      )}
+
+      {!loading && results.length === 0 && !error && (
+        <div className="mt-12 sm:mt-20 text-slate-500 text-center">
+          <p>Start searching for movies, series, or software.</p>
+        </div>
+      )}
+
+      <ResultList results={results} onDownload={handleDownload} />
+
+      {/* Floating Settings Button (Bottom Left) */}
+      <div className="fixed left-4 bottom-14 z-[110]">
         {showSettings && (
-          <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 p-4 text-left">
+          <div className="absolute bottom-full left-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
             <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Search Engines</h3>
-            <div className="space-y-2">
+            <div className="space-y-1 sm:space-y-2">
               {ENGINES.map(engine => (
                 <button
                   key={engine.id}
                   onClick={() => toggleEngine(engine.id)}
-                  className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-700 transition-colors group"
+                  className="w-full flex items-center justify-between p-2.5 sm:p-2 rounded-lg hover:bg-slate-700 transition-colors group"
                 >
                   <span className={selectedEngines.includes(engine.id) ? "text-white" : "text-slate-500"}>
                     {engine.name}
@@ -117,69 +128,60 @@ function App() {
             </div>
           </div>
         )}
-      </header>
-
-      <SearchBar onSearch={handleSearch} isLoading={loading} />
-
-      {error && (
-        <div className="mt-8 p-4 bg-red-900/30 border border-red-800 text-red-400 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      {!loading && results.length === 0 && !error && (
-        <div className="mt-20 text-slate-500 text-center">
-          <p>Start searching for movies, series, or software.</p>
-        </div>
-      )}
-
-      <ResultList results={results} onDownload={handleDownload} />
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className={`p-3 rounded-full shadow-2xl border transition-all duration-300 ${showSettings ? 'bg-blue-600 border-blue-500 text-white rotate-90' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+          title="Search Settings"
+        >
+          <Settings size={28} />
+        </button>
+      </div>
 
       {/* Foldable Debug Bar */}
-      <div className={`fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 transition-all duration-300 z-[100] ${isDebugOpen ? 'h-64' : 'h-10'}`}>
+      <div className={`fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 transition-all duration-300 z-[100] ${isDebugOpen ? 'h-[70vh] sm:h-64' : 'h-10'}`}>
         <button 
           onClick={() => setIsDebugOpen(!isDebugOpen)}
-          className="w-full h-10 flex items-center justify-between px-6 hover:bg-slate-750 transition-colors border-b border-slate-700/50"
+          className="w-full h-10 flex items-center justify-between px-4 sm:px-6 hover:bg-slate-750 transition-colors border-b border-slate-700/50"
         >
-          <div className="flex items-center gap-2 text-slate-300 font-medium text-sm">
-            <Terminal size={16} className="text-blue-500" />
+          <div className="flex items-center gap-2 text-slate-300 font-medium text-xs sm:text-sm">
+            <Terminal size={14} className="text-blue-500 sm:w-4 sm:h-4" />
             <span>DEBUG CONSOLE</span>
             {debugInfo && (
-              <span className="ml-2 px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-400">
-                Total: {debugInfo.totalTime}ms
+              <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 bg-slate-700 rounded text-[10px] sm:text-xs text-slate-400">
+                {debugInfo.totalTime}ms
               </span>
             )}
           </div>
-          {isDebugOpen ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          {isDebugOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>
         
-        <div className="p-4 h-52 overflow-y-auto font-mono text-xs">
+        <div className="p-3 sm:p-4 h-[calc(70vh-40px)] sm:h-52 overflow-y-auto font-mono text-[10px] sm:text-xs">
           {!debugInfo ? (
-            <p className="text-slate-500 italic text-center mt-10">No search logs yet. Start a search to see performance data.</p>
+            <p className="text-slate-500 italic text-center mt-6 sm:mt-10">No search logs yet.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3">
               {debugInfo.logs.map((log, i) => (
-                <div key={i} className={`p-3 rounded-lg border ${log.status === 'success' ? 'bg-emerald-950/20 border-emerald-900/30' : 'bg-red-950/20 border-red-900/30'}`}>
+                <div key={i} className={`p-2.5 sm:p-3 rounded-lg border ${log.status === 'success' ? 'bg-emerald-950/20 border-emerald-900/30' : 'bg-red-950/20 border-red-900/30'}`}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-200 uppercase tracking-tight">{log.engine}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${log.status === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                    <span className="font-bold text-slate-200 uppercase tracking-tight truncate mr-2">{log.engine}</span>
+                    <span className={`px-1 py-0.5 rounded text-[8px] sm:text-[10px] uppercase font-bold shrink-0 ${log.status === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
                       {log.status}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1 text-slate-400">
+                  <div className="flex flex-col gap-0.5 sm:gap-1 text-slate-400">
                     <div className="flex items-center gap-1.5">
-                      <Activity size={12} />
-                      <span>Time: {log.time}ms</span>
+                      <Activity size={10} />
+                      <span>{log.time}ms</span>
                     </div>
                     {log.status === 'success' ? (
                       <div className="flex items-center gap-1.5 text-emerald-400/80">
-                        <Check size={12} />
-                        <span>Found: {log.count} items</span>
+                        <Check size={10} />
+                        <span>{log.count} items</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 text-red-400/80">
-                        <AlertCircle size={12} />
-                        <span className="truncate" title={log.error}>Error: {log.error}</span>
+                        <AlertCircle size={10} />
+                        <span className="truncate" title={log.error}>{log.error}</span>
                       </div>
                     )}
                   </div>

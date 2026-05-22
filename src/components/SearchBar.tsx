@@ -24,18 +24,18 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading }) => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for magnets..."
-          className="w-full px-6 py-4 text-lg bg-slate-800 border-2 border-slate-700 rounded-full focus:outline-none focus:border-blue-500 text-white placeholder-slate-400 shadow-xl transition-all"
+          className="w-full px-5 sm:px-6 py-3.5 sm:py-4 text-base sm:text-lg bg-slate-800 border-2 border-slate-700 rounded-full focus:outline-none focus:border-blue-500 text-white placeholder-slate-400 shadow-xl transition-all"
           disabled={isLoading}
         />
         <button
           type="submit"
           disabled={isLoading}
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-blue-600 hover:bg-blue-500 rounded-full text-white transition-colors disabled:opacity-50"
+          className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-1.5 sm:p-2 bg-blue-600 hover:bg-blue-500 rounded-full text-white transition-colors disabled:opacity-50"
         >
           {isLoading ? (
-            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
-            <Search size={24} />
+            <Search size={20} className="sm:w-6 sm:h-6" />
           )}
         </button>
       </div>
