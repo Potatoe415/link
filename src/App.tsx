@@ -29,6 +29,7 @@ interface DebugInfo {
     time: number;
     count?: number;
     error?: string;
+    method?: string;
   }>;
 }
 
@@ -294,6 +295,12 @@ function App() {
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="font-bold text-slate-200 uppercase tracking-tight shrink-0 w-20 truncate">{log.engine}</span>
                     <span className="text-slate-500 shrink-0 text-[9px]">{log.time}ms</span>
+                    <div className="h-3 w-px bg-slate-700 shrink-0"></div>
+                    {log.method && (
+                      <span className={`px-1 py-0.5 rounded text-[7px] uppercase font-bold shrink-0 ${log.method === 'api' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {log.method === 'api' ? 'API' : 'HTML'}
+                      </span>
+                    )}
                     <div className="h-3 w-px bg-slate-700 shrink-0"></div>
                     {log.status === 'success' ? (
                       <span className="text-emerald-400/80 truncate font-medium">{log.count} items</span>

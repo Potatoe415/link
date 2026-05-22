@@ -95,7 +95,7 @@ const engines = {
     try {
         const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 4000, headers: COMMON_HEADERS });
         if (Array.isArray(resp.data) && resp.data.length > 0 && resp.data[0].id !== "0") {
-            return resp.data
+            const results = resp.data
                 .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
                 .map(item => {
                     const title = cleanTitle(item.name) || 'Unknown TPB Item';
@@ -106,6 +106,7 @@ const engines = {
                         seeders: parseInt(item.seeders) || 0, date: display, timestamp, source: 'PirateBay (API)'
                     };
                 });
+            return { results, method: 'api' };
         }
     } catch (e) {}
 
@@ -128,7 +129,6 @@ const engines = {
                 const dateMatch = descText.match(/Uploaded\s+([\d\s-:]+)/i);
                 const { display, timestamp } = parseDate(dateMatch ? dateMatch[1].split(',')[0] : null);
 
-                // Validate all fields before accepting a scraped result
                 const magnetOk = typeof magnetRaw === 'string' && magnetRaw.startsWith('magnet:?xt=urn:btih:') && magnetRaw.length >= 52;
                 const titleOk  = typeof title === 'string' && title.length >= 3 && !title.startsWith('magnet:');
                 const sizeOk   = sizeStr !== null && sizeBytes > 0;
@@ -141,10 +141,10 @@ const engines = {
                     });
                 }
             });
-            if (results.length > 0) return results;
+            if (results.length > 0) return { results, method: 'scraping' };
         } catch (e) { continue; }
     }
-    return [];
+    return { results: [], method: 'api' };
   },
   limetorrents: async (q) => {
     const config = ENGINE_CONFIGS.limetorrents;
@@ -160,20 +160,20 @@ const engines = {
             const { display, timestamp } = parseDate(rawDate);
             const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
             if (title && magnetUrl) {
-                results.push({ 
+                results.push({
                     title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
-                    seeders, date: display, timestamp, source: 'LimeTorrents' 
+                    seeders, date: display, timestamp, source: 'LimeTorrents'
                 });
             }
         });
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   },
   yts: async (q) => {
     const config = ENGINE_CONFIGS.yts;
     try {
         const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
-        if (!resp.data?.data?.movies) return [];
+        if (!resp.data?.data?.movies) return { results: [], method: 'api' };
         const results = [];
         resp.data.data.movies.forEach(movie => {
             movie.torrents.forEach(t => {
@@ -186,14 +186,14 @@ const engines = {
                 });
             });
         });
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'api' };
+    } catch (e) { return { results: [], method: 'api' }; }
   },
   solid: async (q) => {
     const config = ENGINE_CONFIGS.solid;
     try {
         const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
-        return (resp.data.results || []).map(item => {
+        const results = (resp.data.results || []).map(item => {
             const { display, timestamp } = parseDate(item.createdAt);
             const title = cleanTitle(item.title);
             return {
@@ -201,7 +201,8 @@ const engines = {
                 seeders: item.swarm.seeders, date: display, timestamp, source: 'Solid'
             };
         });
-    } catch (e) { return []; }
+        return { results, method: 'api' };
+    } catch (e) { return { results: [], method: 'api' }; }
   },
   nyaa: async (q) => {
     const config = ENGINE_CONFIGS.nyaa;
@@ -217,14 +218,14 @@ const engines = {
             const { display, timestamp } = parseDate(rawDate);
             const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
             if (title && magnetUrl) {
-                results.push({ 
+                results.push({
                     title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
-                    seeders, date: display, timestamp, source: 'Nyaa' 
+                    seeders, date: display, timestamp, source: 'Nyaa'
                 });
             }
         });
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   },
   "1337x": async (q) => {
     const config = ENGINE_CONFIGS['1337x'];
@@ -250,15 +251,15 @@ const engines = {
                 const fullDate = $$('.list-inline li:contains("Date uploaded")').text().replace("Date uploaded", "").trim() || link.rawDate;
                 const { display, timestamp } = parseDate(fullDate);
                 if (magnetUrl) {
-                    results.push({ 
+                    results.push({
                         title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
-                        seeders: link.seeders, date: display, timestamp, source: '1337x' 
+                        seeders: link.seeders, date: display, timestamp, source: '1337x'
                     });
                 }
             } catch (e) {}
         }
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   },
   torrentz2: async (q) => {
     const config = ENGINE_CONFIGS.torrentz2;
@@ -294,8 +295,8 @@ const engines = {
             } catch (e) {}
             return null;
         }));
-        return settled.filter(Boolean);
-    } catch (e) { return []; }
+        return { results: settled.filter(Boolean), method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   },
   kickass: async (q) => {
     const config = ENGINE_CONFIGS.kickass;
@@ -317,8 +318,8 @@ const engines = {
                 });
             }
         });
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   },
   fitgirl: async (q) => {
     const config = ENGINE_CONFIGS.fitgirl;
@@ -338,8 +339,8 @@ const engines = {
                 });
             }
         });
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   },
   torrent9: async (q) => {
     const config = ENGINE_CONFIGS.torrent9;
@@ -364,15 +365,15 @@ const engines = {
                 const rawDate = $$('.start-session').text().split(':').pop().trim();
                 const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {
-                    results.push({ 
+                    results.push({
                         title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
-                        date: display, timestamp, seeders: link.seeders, source: 'Torrent9 (FR)' 
+                        date: display, timestamp, seeders: link.seeders, source: 'Torrent9 (FR)'
                     });
                 }
             } catch (e) {}
         }
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   },
   oxtorrent: async (q) => {
     const config = ENGINE_CONFIGS.oxtorrent;
@@ -397,15 +398,15 @@ const engines = {
                 const rawDate = $$('.start-session').text().split(':').pop().trim();
                 const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {
-                    results.push({ 
+                    results.push({
                         title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
-                        date: display, timestamp, seeders: link.seeders, source: 'OxTorrent (FR)' 
+                        date: display, timestamp, seeders: link.seeders, source: 'OxTorrent (FR)'
                     });
                 }
             } catch (e) {}
         }
-        return results;
-    } catch (e) { return []; }
+        return { results, method: 'scraping' };
+    } catch (e) { return { results: [], method: 'scraping' }; }
   }
 };
 
@@ -420,11 +421,11 @@ export default async function handler(req, res) {
     .map(async (name) => {
       const engineStart = Date.now();
       try {
-        const results = await engines[name](q);
-        logs.push({ engine: name, status: 'success', time: Date.now() - engineStart, count: results.length });
+        const { results, method } = await engines[name](q);
+        logs.push({ engine: name, status: 'success', time: Date.now() - engineStart, count: results.length, method });
         return results;
       } catch (err) {
-        logs.push({ engine: name, status: 'error', time: Date.now() - engineStart, error: err.message });
+        logs.push({ engine: name, status: 'error', time: Date.now() - engineStart, error: err.message, method: 'unknown' });
         return [];
       }
     });
