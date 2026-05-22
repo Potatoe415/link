@@ -34,30 +34,47 @@ const cleanTitle = (str) => {
 const parseDate = (dateStr) => {
     if (!dateStr) return { display: 'N/A', timestamp: 0 };
     const now = new Date();
+    const currentYear = now.getFullYear();
     const s = dateStr.toLowerCase().trim();
     let d = new Date(s);
 
     if (!isNaN(s) && !isNaN(parseFloat(s))) {
+        // Unix timestamp in ms
         d = new Date(parseInt(s));
     }
     else if (s === 'today') d = now;
+    else if (s.startsWith('today')) d = now;
     else if (s === 'yesterday') d = new Date(now.getTime() - 86400000);
+    else if (s.startsWith('y-day') || s.startsWith('yest')) d = new Date(now.getTime() - 86400000);
     else {
-        // Match both abbreviated ("7y ago", "3mo ago", "5d ago") and full ("5 days", "2 hours ago")
-        const relMatch = s.match(/(\d+)\s*(y(?:r|ear)?s?|mo(?:nth)?s?|w(?:k|eek)?s?|d(?:ay)?s?|h(?:r|our)?s?|min(?:ute)?s?)/);
-        if (relMatch) {
-            const num = parseInt(relMatch[1]);
-            const unit = relMatch[2];
-            if (/^y/.test(unit))       d = new Date(now.getTime() - num * 31536000000);
-            else if (/^mo/.test(unit)) d = new Date(now.getTime() - num * 2592000000);
-            else if (/^w/.test(unit))  d = new Date(now.getTime() - num * 604800000);
-            else if (/^d/.test(unit))  d = new Date(now.getTime() - num * 86400000);
-            else if (/^h/.test(unit))  d = new Date(now.getTime() - num * 3600000);
-            else if (/^mi/.test(unit)) d = new Date(now.getTime() - num * 60000);
+        // MM-DD or MM-DD HH:MM  (TPB mirrors omit the year in their description text)
+        // Use $ anchor so "05-20-2025" and "05-20 2025" don't match (they already parse fine)
+        const mmdd = s.match(/^(\d{1,2})-(\d{1,2})(?:\s+\d{1,2}:\d{2})?$/);
+        if (mmdd) {
+            const month = parseInt(mmdd[1]) - 1;
+            const day   = parseInt(mmdd[2]);
+            d = new Date(currentYear, month, day);
+            // If the resulting date is in the future by more than 7 days, it's last year
+            if (d.getTime() > now.getTime() + 7 * 86400000) {
+                d = new Date(currentYear - 1, month, day);
+            }
         } else {
-            // Try fixing short year format: '24 → 2024
-            const fixedYear = s.replace(/'(\d{2})/, '20$1');
-            d = new Date(fixedYear);
+            // Match relative ("7y ago", "3mo ago", "5d ago", "2 hours ago")
+            const relMatch = s.match(/(\d+)\s*(y(?:r|ear)?s?|mo(?:nth)?s?|w(?:k|eek)?s?|d(?:ay)?s?|h(?:r|our)?s?|min(?:ute)?s?)/);
+            if (relMatch) {
+                const num = parseInt(relMatch[1]);
+                const unit = relMatch[2];
+                if (/^y/.test(unit))       d = new Date(now.getTime() - num * 31536000000);
+                else if (/^mo/.test(unit)) d = new Date(now.getTime() - num * 2592000000);
+                else if (/^w/.test(unit))  d = new Date(now.getTime() - num * 604800000);
+                else if (/^d/.test(unit))  d = new Date(now.getTime() - num * 86400000);
+                else if (/^h/.test(unit))  d = new Date(now.getTime() - num * 3600000);
+                else if (/^mi/.test(unit)) d = new Date(now.getTime() - num * 60000);
+            } else {
+                // Try fixing short year: '25 → 2025
+                const fixedYear = s.replace(/'(\d{2})/, '20$1');
+                d = new Date(fixedYear);
+            }
         }
     }
 
