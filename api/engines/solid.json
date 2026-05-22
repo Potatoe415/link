@@ -1,8 +1,16 @@
 {
   "id": "solid",
-  "name": "SolidTorrents",
+  "name": "Bitsearch",
   "type": "api",
   "urls": {
-    "primary": "https://solidtorrents.net/api/v1/search?q={{q}}"
+    "primary": "https://bitsearch.eu/api/v1/search?q={{q}}&limit=20",
+    "html": "https://bitsearch.eu/search?q={{q}}"
+  },
+  "selectors": {
+    "rows": "li.card",
+    "title": "h3 a",
+    "magnet": "a[href^=\"magnet:\"]",
+    "size": ".stats li:first-child",
+    "seeders": ".stats li:nth-child(3)"
   }
 }

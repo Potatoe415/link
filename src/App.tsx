@@ -9,7 +9,7 @@ const ENGINES = [
   { id: '1337x', name: '1337x' },
   { id: 'limetorrents', name: 'LimeTorrents' },
   { id: 'yts', name: 'YTS (Movies)' },
-  { id: 'solid', name: 'SolidTorrents' },
+  { id: 'solid', name: 'Bitsearch' },
   { id: 'nyaa', name: 'Nyaa (Anime)' },
   { id: 'kickass', name: 'Kickass (KAT)' },
   { id: 'torrentz2', name: 'Torrentz2' },

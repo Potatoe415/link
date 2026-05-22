@@ -171,37 +171,103 @@ const engines = {
   },
   yts: async (q) => {
     const config = ENGINE_CONFIGS.yts;
+    // --- API pass ---
     try {
         const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
-        if (!resp.data?.data?.movies) return { results: [], method: 'api' };
-        const results = [];
-        resp.data.data.movies.forEach(movie => {
-            movie.torrents.forEach(t => {
-                const title = cleanTitle(`${movie.title_long} [${t.quality}] [${t.type}]`);
-                const { display, timestamp } = parseDate(movie.date_uploaded);
-                results.push({
-                    title, magnetUrl: `magnet:?xt=urn:btih:${t.hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
-                    size: t.size, sizeBytes: t.size_bytes || parseSizeBytes(t.size),
-                    seeders: t.seeds, date: display, timestamp, source: 'YTS'
+        const movies = resp.data?.data?.movies;
+        if (movies && movies.length > 0) {
+            const results = [];
+            movies.forEach(movie => {
+                movie.torrents.forEach(t => {
+                    const title = cleanTitle(`${movie.title_long} [${t.quality}] [${t.type}]`);
+                    const { display, timestamp } = parseDate(movie.date_uploaded);
+                    results.push({
+                        title, magnetUrl: `magnet:?xt=urn:btih:${t.hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
+                        size: t.size, sizeBytes: t.size_bytes || parseSizeBytes(t.size),
+                        seeders: t.seeds, date: display, timestamp, source: 'YTS'
+                    });
                 });
             });
+            return { results, method: 'api' };
+        }
+    } catch (e) {}
+    // --- HTML fallback (two-pass: browse page → movie detail) ---
+    try {
+        const browseUrl = `https://yts.mx/browse-movies/${encodeURIComponent(q)}/all/all/0/latest/0/all`;
+        const listResp = await axios.get(browseUrl, { timeout: 8000, headers: COMMON_HEADERS });
+        const $ = cheerio.load(listResp.data);
+        const detailUrls = [];
+        $('div.browse-movie-wrap').each((i, el) => {
+            const href = $(el).find('a.browse-movie-link').attr('href');
+            if (href) detailUrls.push(href);
         });
-        return { results, method: 'api' };
+        const settled = await Promise.all(detailUrls.slice(0, 5).map(async (detailUrl) => {
+            try {
+                const detailResp = await axios.get(detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
+                const $$ = cheerio.load(detailResp.data);
+                const titleRaw = $$('h1[itemprop="name"]').first().text().trim() || $$('h1').first().text().trim();
+                const year = $$('span[itemprop="dateCreated"]').first().text().trim();
+                const { display, timestamp } = parseDate(year);
+                const items = [];
+                $$('a.download-torrent[data-hash]').each((i, el) => {
+                    const hash = $$(el).attr('data-hash');
+                    const quality = $$(el).closest('.modal-torrent').find('.modal-quality span').text().trim() || '?';
+                    const sizeStr = $$(el).closest('.modal-torrent').find('.quality-size').text().trim();
+                    if (hash) {
+                        const title = cleanTitle(`${titleRaw} [${quality}]`);
+                        items.push({
+                            title, magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
+                            size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                            seeders: 0, date: display, timestamp, source: 'YTS (HTML)'
+                        });
+                    }
+                });
+                return items;
+            } catch (e) { return []; }
+        }));
+        const results = settled.flat();
+        return { results, method: 'scraping' };
     } catch (e) { return { results: [], method: 'api' }; }
   },
   solid: async (q) => {
     const config = ENGINE_CONFIGS.solid;
+    // --- API pass (bitsearch.eu — solidtorrents.net now redirects there) ---
     try {
         const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
-        const results = (resp.data.results || []).map(item => {
-            const { display, timestamp } = parseDate(item.createdAt);
-            const title = cleanTitle(item.title);
-            return {
-                title, magnetUrl: item.magnet + TRACKERS, size: formatSize(item.size), sizeBytes: item.size || 0,
-                seeders: item.swarm.seeders, date: display, timestamp, source: 'Solid'
-            };
+        const items = resp.data?.results || [];
+        if (items.length > 0) {
+            const results = items.map(item => {
+                const title = cleanTitle(item.title);
+                const { display, timestamp } = parseDate(item.updatedAt);
+                return {
+                    title,
+                    magnetUrl: `magnet:?xt=urn:btih:${item.infohash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
+                    size: formatSize(item.size), sizeBytes: item.size || 0,
+                    seeders: item.seeders || 0, date: display, timestamp, source: 'Bitsearch'
+                };
+            });
+            return { results, method: 'api' };
+        }
+    } catch (e) {}
+    // --- HTML fallback ---
+    try {
+        const htmlUrl = config.urls.html.replace('{{q}}', encodeURIComponent(q));
+        const resp = await axios.get(htmlUrl, { timeout: 8000, headers: COMMON_HEADERS });
+        const $ = cheerio.load(resp.data);
+        const results = [];
+        $(config.selectors.rows).each((i, el) => {
+            const title = cleanTitle($(el).find(config.selectors.title).text());
+            const magnetUrl = $(el).find(config.selectors.magnet).attr('href');
+            const sizeStr = $(el).find(config.selectors.size).text().trim();
+            const seeders = parseInt($(el).find(config.selectors.seeders).text()) || 0;
+            if (title && magnetUrl) {
+                results.push({
+                    title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                    seeders, date: 'N/A', timestamp: 0, source: 'Bitsearch (HTML)'
+                });
+            }
         });
-        return { results, method: 'api' };
+        return { results, method: 'scraping' };
     } catch (e) { return { results: [], method: 'api' }; }
   },
   nyaa: async (q) => {
