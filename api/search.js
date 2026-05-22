@@ -412,26 +412,31 @@ const engines = {
 
 export default async function handler(req, res) {
   const startTime = Date.now();
-  const { q, selectedEngines } = req.query;
-  if (!q) return res.status(400).json({ error: 'Query is required' });
-  const activeEngines = selectedEngines ? selectedEngines.split(',') : Object.keys(engines);
-  const logs = [];
-  const searchPromises = activeEngines
-    .filter(name => engines[name])
-    .map(async (name) => {
-      const engineStart = Date.now();
-      try {
-        const { results, method } = await engines[name](q);
-        logs.push({ engine: name, status: 'success', time: Date.now() - engineStart, count: results.length, method });
-        return results;
-      } catch (err) {
-        logs.push({ engine: name, status: 'error', time: Date.now() - engineStart, error: err.message, method: 'unknown' });
-        return [];
-      }
+  try {
+    const { q, selectedEngines } = req.query;
+    if (!q) return res.status(400).json({ error: 'Query is required' });
+    const activeEngines = selectedEngines ? selectedEngines.split(',') : Object.keys(engines);
+    const logs = [];
+    const searchPromises = activeEngines
+      .filter(name => engines[name])
+      .map(async (name) => {
+        const engineStart = Date.now();
+        try {
+          const { results, method } = await engines[name](q);
+          logs.push({ engine: name, status: 'success', time: Date.now() - engineStart, count: results.length, method });
+          return results;
+        } catch (err) {
+          logs.push({ engine: name, status: 'error', time: Date.now() - engineStart, error: err.message, method: 'unknown' });
+          return [];
+        }
+      });
+    const allResults = (await Promise.all(searchPromises)).flat();
+    return res.status(200).json({
+      results: allResults,
+      debug: { totalTime: Date.now() - startTime, logs }
     });
-  const allResults = (await Promise.all(searchPromises)).flat();
-  return res.status(200).json({
-    results: allResults,
-    debug: { totalTime: Date.now() - startTime, logs }
-  });
+  } catch (err) {
+    console.error('[MagnetFinder] Unhandled handler error:', err);
+    return res.status(500).json({ error: `Internal server error: ${err.message}` });
+  }
 }
