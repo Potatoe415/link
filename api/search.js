@@ -20,14 +20,27 @@ const cleanTitle = (str) => {
 };
 
 const formatDate = (dateInput) => {
-    if (!dateInput) return 'N/A';
+    if (!dateInput) return { display: 'N/A', timestamp: 0 };
     try {
         const d = new Date(dateInput);
-        if (isNaN(d.getTime())) return dateInput;
-        return d.toISOString().split('T')[0];
+        if (isNaN(d.getTime())) return { display: dateInput, timestamp: 0 };
+        return { 
+            display: d.toISOString().split('T')[0], 
+            timestamp: d.getTime() 
+        };
     } catch (e) {
-        return dateInput;
+        return { display: dateInput, timestamp: 0 };
     }
+};
+
+const parseSizeBytes = (sizeStr) => {
+    if (!sizeStr) return 0;
+    const s = sizeStr.toLowerCase();
+    const val = parseFloat(s);
+    if (s.includes('gb')) return val * 1024 * 1024 * 1024;
+    if (s.includes('mb')) return val * 1024 * 1024;
+    if (s.includes('kb')) return val * 1024;
+    return val;
 };
 
 const COMMON_HEADERS = {
@@ -48,12 +61,15 @@ const engines = {
       .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
       .map(item => {
         const title = cleanTitle(item.name);
+        const { display, timestamp } = formatDate(item.added ? parseInt(item.added) * 1000 : null);
         return {
           title: title,
           magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}`,
           size: formatSize(item.size),
+          sizeBytes: parseInt(item.size) || 0,
           seeders: parseInt(item.seeders) || 0,
-          date: item.added ? formatDate(parseInt(item.added) * 1000) : 'N/A',
+          date: display,
+          timestamp: timestamp,
           source: 'Apibay'
         };
       });
@@ -69,10 +85,21 @@ const engines = {
       const rawTitle = $(el).find('div.tt-name a:nth-child(2)').text();
       const title = cleanTitle(rawTitle);
       const magnetUrl = $(el).find('td.tdnormal:nth-of-type(3) a.csbuttons[href^="magnet:"]').attr('href');
-      const size = $(el).find('td.tdnormal:nth-of-type(2)').text().trim();
-      const date = $(el).find('td.tdnormal:nth-of-type(1)').text().trim().split(' - ')[0] || 'N/A';
+      const sizeStr = $(el).find('td.tdnormal:nth-of-type(2)').text().trim();
+      const rawDate = $(el).find('td.tdnormal:nth-of-type(1)').text().trim().split(' - ')[0];
+      const { display, timestamp } = formatDate(rawDate);
       const seeders = parseInt($(el).find('td.tdseed').text().trim()) || 0;
-      if (title && magnetUrl) results.push({ title, magnetUrl, size, seeders, date, source: 'LimeTorrents' });
+      if (title && magnetUrl) {
+          results.push({ 
+              title, magnetUrl, 
+              size: sizeStr, 
+              sizeBytes: parseSizeBytes(sizeStr),
+              seeders, 
+              date: display,
+              timestamp,
+              source: 'LimeTorrents' 
+          });
+      }
     });
     return results;
   },
@@ -86,12 +113,15 @@ const engines = {
     resp.data.data.movies.forEach(movie => {
       movie.torrents.forEach(t => {
         const title = cleanTitle(`${movie.title_long} [${t.quality}] [${t.type}]`);
+        const { display, timestamp } = formatDate(movie.date_uploaded);
         results.push({
           title: title,
           magnetUrl: `magnet:?xt=urn:btih:${t.hash}&dn=${encodeURIComponent(title)}`,
           size: t.size,
+          sizeBytes: t.size_bytes || parseSizeBytes(t.size),
           seeders: t.seeds,
-          date: movie.date_uploaded ? movie.date_uploaded.split(' ')[0] : 'N/A',
+          date: display,
+          timestamp: timestamp,
           source: 'YTS'
         });
       });
@@ -103,14 +133,19 @@ const engines = {
         timeout: 8000,
         headers: COMMON_HEADERS
     });
-    return (resp.data.results || []).map(item => ({
-      title: cleanTitle(item.title),
-      magnetUrl: item.magnet,
-      size: formatSize(item.size),
-      seeders: item.swarm.seeders,
-      date: formatDate(item.createdAt),
-      source: 'Solid'
-    }));
+    return (resp.data.results || []).map(item => {
+        const { display, timestamp } = formatDate(item.createdAt);
+        return {
+            title: cleanTitle(item.title),
+            magnetUrl: item.magnet,
+            size: formatSize(item.size),
+            sizeBytes: item.size || 0,
+            seeders: item.swarm.seeders,
+            date: display,
+            timestamp,
+            source: 'Solid'
+        };
+    });
   },
   nyaa: async (q) => {
     const resp = await axios.get(`https://nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(q)}`, { 
@@ -122,10 +157,18 @@ const engines = {
     $('tr.default, tr.success, tr.danger').each((i, el) => {
         const title = cleanTitle($(el).find('td:nth-child(2) a:last-child').text());
         const magnetUrl = $(el).find('td:nth-child(3) a[href^="magnet:"]').attr('href');
-        const size = $(el).find('td:nth-child(4)').text().trim();
-        const date = $(el).find('td:nth-child(5)').text().trim().split(' ')[0] || 'N/A';
+        const sizeStr = $(el).find('td:nth-child(4)').text().trim();
+        const rawDate = $(el).find('td:nth-child(5)').text().trim().split(' ')[0];
+        const { display, timestamp } = formatDate(rawDate);
         const seeders = parseInt($(el).find('td:nth-child(6)').text().trim()) || 0;
-        if (title && magnetUrl) results.push({ title, magnetUrl, size, seeders, date, source: 'Nyaa' });
+        if (title && magnetUrl) {
+            results.push({ 
+                title, magnetUrl, 
+                size: sizeStr, 
+                sizeBytes: parseSizeBytes(sizeStr),
+                seeders, date: display, timestamp, source: 'Nyaa' 
+            });
+        }
     });
     return results;
   },
@@ -136,10 +179,10 @@ const engines = {
     $('table.table-list tbody tr').each((i, el) => {
         const title = cleanTitle($(el).find('td.coll-1.name a:last-child').text());
         const detailUrl = "https://1337x.to" + $(el).find('td.coll-1.name a:last-child').attr('href');
-        const size = $(el).find('td.coll-4.size').contents().first().text().trim();
-        const date = $(el).find('td.coll-date').text().trim() || 'N/A';
+        const sizeStr = $(el).find('td.coll-4.size').contents().first().text().trim();
+        const rawDate = $(el).find('td.coll-date').text().trim();
         const seeders = parseInt($(el).find('td.coll-2.seeds').text().trim()) || 0;
-        if (title && detailUrl) links.push({ title, detailUrl, size, seeders, date });
+        if (title && detailUrl) links.push({ title, detailUrl, sizeStr, seeders, rawDate });
     });
 
     const results = [];
@@ -148,7 +191,21 @@ const engines = {
             const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').first().attr('href');
-            if (magnetUrl) results.push({ ...link, magnetUrl, source: '1337x' });
+            // Try to get actual date from detail page if list page is vague
+            const fullDate = $$('.list-inline li:contains("Date uploaded")').text().replace("Date uploaded", "").trim() || link.rawDate;
+            const { display, timestamp } = formatDate(fullDate);
+            if (magnetUrl) {
+                results.push({ 
+                    title: link.title, 
+                    magnetUrl, 
+                    size: link.sizeStr, 
+                    sizeBytes: parseSizeBytes(link.sizeStr),
+                    seeders: link.seeders, 
+                    date: display,
+                    timestamp,
+                    source: '1337x' 
+                });
+            }
         } catch (e) {}
     }
     return results;
@@ -160,9 +217,9 @@ const engines = {
     $('table.table-hover tbody tr').each((i, el) => {
         const title = cleanTitle($(el).find('a').text());
         const detailUrl = "https://www.torrent9.to" + $(el).find('a').attr('href');
-        const size = $(el).find('td:nth-child(2)').text().trim();
+        const sizeStr = $(el).find('td:nth-child(2)').text().trim();
         const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
-        if (title && detailUrl) detailLinks.push({ title, detailUrl, size, seeders, date: 'N/A' });
+        if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
     });
     const results = [];
     for (const link of detailLinks.slice(0, 3)) {
@@ -170,8 +227,20 @@ const engines = {
             const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').attr('href');
-            const date = $$('.start-session').text().split(':').pop().trim() || 'N/A';
-            if (magnetUrl) results.push({ ...link, magnetUrl, date, source: 'Torrent9 (FR)' });
+            const rawDate = $$('.start-session').text().split(':').pop().trim();
+            const { display, timestamp } = formatDate(rawDate);
+            if (magnetUrl) {
+                results.push({ 
+                    title: link.title, 
+                    magnetUrl, 
+                    size: link.sizeStr,
+                    sizeBytes: parseSizeBytes(link.sizeStr),
+                    date: display,
+                    timestamp,
+                    seeders: link.seeders, 
+                    source: 'Torrent9 (FR)' 
+                });
+            }
         } catch (e) {}
     }
     return results;
@@ -183,9 +252,9 @@ const engines = {
     $('table.table-hover tbody tr').each((i, el) => {
         const title = cleanTitle($(el).find('a').text());
         const detailUrl = "https://www.oxtorrent.town" + $(el).find('a').attr('href');
-        const size = $(el).find('td:nth-child(2)').text().trim();
+        const sizeStr = $(el).find('td:nth-child(2)').text().trim();
         const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
-        if (title && detailUrl) detailLinks.push({ title, detailUrl, size, seeders, date: 'N/A' });
+        if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
     });
     const results = [];
     for (const link of detailLinks.slice(0, 3)) {
@@ -193,8 +262,20 @@ const engines = {
             const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').attr('href');
-            const date = $$('.start-session').text().split(':').pop().trim() || 'N/A';
-            if (magnetUrl) results.push({ ...link, magnetUrl, date, source: 'OxTorrent (FR)' });
+            const rawDate = $$('.start-session').text().split(':').pop().trim();
+            const { display, timestamp } = formatDate(rawDate);
+            if (magnetUrl) {
+                results.push({ 
+                    title: link.title, 
+                    magnetUrl, 
+                    size: link.sizeStr,
+                    sizeBytes: parseSizeBytes(link.sizeStr),
+                    date: display,
+                    timestamp,
+                    seeders: link.seeders, 
+                    source: 'OxTorrent (FR)' 
+                });
+            }
         } catch (e) {}
     }
     return results;
@@ -229,7 +310,7 @@ export default async function handler(req, res) {
   const allResults = (await Promise.all(searchPromises)).flat();
   
   return res.status(200).json({
-    results: allResults.sort((a, b) => b.seeders - a.seeders),
+    results: allResults, // We'll sort on frontend now for more flexibility
     debug: {
         totalTime: Date.now() - startTime,
         logs: logs

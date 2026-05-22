@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Settings, Check, Terminal, ChevronUp, ChevronDown, Activity, AlertCircle } from "lucide-react";
 import SearchBar from "./components/SearchBar";
 import ResultList from "./components/ResultList";
@@ -27,16 +27,29 @@ interface DebugInfo {
   }>;
 }
 
+type SortOption = 'seeders' | 'size' | 'date';
+
 function App() {
   const [results, setResults] = useState<TorrentResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedEngines, setSelectedEngines] = useState<string[]>(ENGINES.map(e => e.id));
+  const [sortBy, setSortBy] = useState<SortOption>('seeders');
   
   // Debug State
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
+
+  // Sorting Logic
+  const sortedResults = useMemo(() => {
+    return [...results].sort((a, b) => {
+      if (sortBy === 'seeders') return b.seeders - a.seeders;
+      if (sortBy === 'size') return b.sizeBytes - a.sizeBytes;
+      if (sortBy === 'date') return b.timestamp - a.timestamp;
+      return 0;
+    });
+  }, [results, sortBy]);
 
   const toggleEngine = (id: string) => {
     setSelectedEngines(prev => 
@@ -59,7 +72,6 @@ function App() {
       
       const data = await response.json();
       
-      // Support both new object format { results, debug } and old array format
       if (data && !Array.isArray(data) && data.results) {
         setResults(data.results);
         setDebugInfo(data.debug || null);
@@ -93,6 +105,25 @@ function App() {
 
       <SearchBar onSearch={handleSearch} isLoading={loading} />
 
+      {/* Sorting Tabs */}
+      {results.length > 0 && (
+        <div className="flex items-center gap-2 mt-8 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
+          {[
+            { id: 'seeders', label: 'Most Seeders' },
+            { id: 'size', label: 'Largest Size' },
+            { id: 'date', label: 'Newest First' }
+          ].map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setSortBy(opt.id as SortOption)}
+              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${sortBy === opt.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && (
         <div className="mt-8 p-4 bg-red-900/30 border border-red-800 text-red-400 rounded-lg text-sm sm:text-base">
           {error}
@@ -105,7 +136,7 @@ function App() {
         </div>
       )}
 
-      <ResultList results={results} onDownload={handleDownload} />
+      <ResultList results={sortedResults} onDownload={handleDownload} />
 
       {/* Floating Settings Button (Bottom Left) */}
       <div className="fixed left-4 bottom-14 z-[110]">
@@ -176,7 +207,7 @@ function App() {
                     {log.status === 'success' ? (
                       <div className="flex items-center gap-1.5 text-emerald-400/80">
                         <Check size={10} />
-                        <span>{log.count} items</span>
+                        <span>Found: {log.count} items</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 text-red-400/80">
