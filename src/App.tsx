@@ -37,11 +37,10 @@ function App() {
   const [selectedEngines, setSelectedEngines] = useState<string[]>(ENGINES.map(e => e.id));
   const [sortBy, setSortBy] = useState<SortOption>('seeders');
   
-  // Debug State
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
 
-  // Sorting Logic
+  // Dynamic Client-side Sorting
   const sortedResults = useMemo(() => {
     return [...results].sort((a, b) => {
       if (sortBy === 'seeders') return b.seeders - a.seeders;
@@ -105,18 +104,18 @@ function App() {
 
       <SearchBar onSearch={handleSearch} isLoading={loading} />
 
-      {/* Sorting Tabs */}
+      {/* Sorting Tabs - Client Side Only */}
       {results.length > 0 && (
-        <div className="flex items-center gap-2 mt-8 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
+        <div className="flex items-center gap-1 sm:gap-2 mt-8 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
           {[
-            { id: 'seeders', label: 'Most Seeders' },
-            { id: 'size', label: 'Largest Size' },
-            { id: 'date', label: 'Newest First' }
+            { id: 'seeders', label: 'Seeders' },
+            { id: 'size', label: 'Size' },
+            { id: 'date', label: 'Newest' }
           ].map(opt => (
             <button
               key={opt.id}
               onClick={() => setSortBy(opt.id as SortOption)}
-              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${sortBy === opt.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}
+              className={`px-3 sm:px-4 py-1.5 rounded-lg text-[10px] sm:text-sm font-semibold transition-all ${sortBy === opt.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 'text-slate-500 hover:text-white hover:bg-slate-700'}`}
             >
               {opt.label}
             </button>
@@ -161,14 +160,13 @@ function App() {
         )}
         <button 
           onClick={() => setShowSettings(!showSettings)}
-          className={`p-3 rounded-full shadow-2xl border transition-all duration-300 ${showSettings ? 'bg-blue-600 border-blue-500 text-white rotate-90' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+          className={`p-3 rounded-full shadow-2xl border transition-all duration-300 ${showSettings ? 'bg-blue-600 border-blue-500 text-white rotate-90 scale-110' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
           title="Search Settings"
         >
           <Settings size={28} />
         </button>
       </div>
 
-      {/* Foldable Debug Bar */}
       <div className={`fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 transition-all duration-300 z-[100] ${isDebugOpen ? 'h-[70vh] sm:h-64' : 'h-10'}`}>
         <button 
           onClick={() => setIsDebugOpen(!isDebugOpen)}

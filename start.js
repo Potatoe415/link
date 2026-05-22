@@ -63,7 +63,6 @@ const COMMON_HEADERS = {
   'Accept-Language': 'en-US,en;q=0.9,fr-FR;q=0.8,fr;q=0.7'
 };
 
-// Search Engines Implementation
 const engines = {
   apibay: async (q) => {
     const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
@@ -104,9 +103,7 @@ const engines = {
               title, magnetUrl, 
               size: sizeStr, 
               sizeBytes: parseSizeBytes(sizeStr),
-              seeders, 
-              date: display,
-              timestamp,
+              seeders, date: display, timestamp,
               source: 'LimeTorrents' 
           });
       }
