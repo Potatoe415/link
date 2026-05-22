@@ -19,6 +19,8 @@ const cleanTitle = (str) => {
   try {
       let decoded = he.decode(he.decode(str));
       decoded = decoded.replace(/[\n\r\t]/g, ' ').replace(/\s\s+/g, ' ').trim();
+      // Safety: If it starts with magnet:, it's not a title
+      if (decoded.startsWith('magnet:?')) return '';
       return decoded;
   } catch (e) {
       return str.trim();
@@ -73,9 +75,20 @@ const COMMON_HEADERS = {
   'Referer': 'https://www.google.com/'
 };
 
+// Standard public trackers to make magnet links work instantly
+const TRACKERS = [
+    'udp://tracker.opentrackr.org:1337/announce',
+    'udp://open.stealth.si:80/announce',
+    'udp://tracker.torrent.eu.org:451/announce',
+    'udp://tracker.bittor.pw:1337/announce',
+    'udp://public.popcorn-tracker.org:6969/announce',
+    'udp://tracker.cyberia.is:6969/announce',
+    'udp://exodus.desync.com:6969/announce',
+    'udp://open.demonii.com:1337/announce'
+].map(t => `&tr=${encodeURIComponent(t)}`).join('');
+
 const engines = {
   apibay: async (q) => {
-    // 1. Try official Apibay API
     try {
         const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 4000, headers: COMMON_HEADERS });
         if (Array.isArray(resp.data) && resp.data.length > 0 && resp.data[0].id !== "0") {
@@ -85,23 +98,19 @@ const engines = {
                     const title = cleanTitle(item.name) || 'Unknown TPB Item';
                     const { display, timestamp } = parseDate(item.added ? parseInt(item.added) * 1000 : null);
                     return {
-                        title, magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}`,
+                        title, magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
                         size: formatSize(item.size), sizeBytes: parseInt(item.size) || 0,
                         seeders: parseInt(item.seeders) || 0, date: display, timestamp, source: 'PirateBay (API)'
                     };
                 });
         }
-    } catch (e) {
-        console.log("Apibay API Failed");
-    }
+    } catch (e) {}
 
-    // 2. Mirror list (Proxy Scraping)
     const mirrors = [
         'https://tpb.party',
         'https://thepiratebay10.org',
         'https://piratebayproxy.net',
-        'https://thepiratebay.zone',
-        'https://tpb.mmo.com.co'
+        'https://thepiratebay.zone'
     ];
 
     for (const mirror of mirrors) {
@@ -110,36 +119,26 @@ const engines = {
             const proxyResp = await axios.get(url, { timeout: 5000, headers: COMMON_HEADERS });
             const $ = cheerio.load(proxyResp.data);
             const results = [];
-            
             $('table#searchResult tr').each((i, el) => {
                 if (i === 0) return;
-                
-                // Try multiple selectors for the title as proxies vary
-                const nameLink = $(el).find('div.detName a, a.detLink, td:nth-child(2) a:first-child').first();
-                const title = cleanTitle(nameLink.text());
-                
+                const linkEl = $(el).find('div.detName a, a.detLink').first();
+                const title = cleanTitle(linkEl.text());
                 const magnetUrl = $(el).find('a[href^="magnet:"]').attr('href');
                 const seeders = parseInt($(el).find('td:nth-last-child(2)').text()) || 0;
                 const descText = $(el).find('font.detDesc, .detDesc').text();
-                
                 const sizeMatch = descText.match(/Size ([\d.]+\s+[KMG]iB)/i);
                 const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : 'N/A';
-                
                 const dateMatch = descText.match(/Uploaded ([\d-]+)/i);
                 const { display, timestamp } = parseDate(dateMatch ? dateMatch[1] : null);
-
                 if (title && magnetUrl && title.length > 2) {
                     results.push({
-                        title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                        title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                         seeders, date: display, timestamp, source: `PirateBay (Mirror)`
                     });
                 }
             });
-
             if (results.length > 0) return results;
-        } catch (e) {
-            continue;
-        }
+        } catch (e) { continue; }
     }
     return [];
   },
@@ -157,7 +156,7 @@ const engines = {
             const seeders = parseInt($(el).find('td.tdseed').text().trim()) || 0;
             if (title && magnetUrl) {
                 results.push({ 
-                    title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                    title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                     seeders, date: display, timestamp, source: 'LimeTorrents' 
                 });
             }
@@ -175,7 +174,7 @@ const engines = {
                 const title = cleanTitle(`${movie.title_long} [${t.quality}] [${t.type}]`);
                 const { display, timestamp } = parseDate(movie.date_uploaded);
                 results.push({
-                    title, magnetUrl: `magnet:?xt=urn:btih:${t.hash}&dn=${encodeURIComponent(title)}`,
+                    title, magnetUrl: `magnet:?xt=urn:btih:${t.hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
                     size: t.size, sizeBytes: t.size_bytes || parseSizeBytes(t.size),
                     seeders: t.seeds, date: display, timestamp, source: 'YTS'
                 });
@@ -191,7 +190,7 @@ const engines = {
             const { display, timestamp } = parseDate(item.createdAt);
             const title = cleanTitle(item.title);
             return {
-                title, magnetUrl: item.magnet, size: formatSize(item.size), sizeBytes: item.size || 0,
+                title, magnetUrl: item.magnet + TRACKERS, size: formatSize(item.size), sizeBytes: item.size || 0,
                 seeders: item.swarm.seeders, date: display, timestamp, source: 'Solid'
             };
         });
@@ -211,7 +210,7 @@ const engines = {
             const seeders = parseInt($(el).find('td:nth-child(6)').text().trim()) || 0;
             if (title && magnetUrl) {
                 results.push({ 
-                    title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                    title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                     seeders, date: display, timestamp, source: 'Nyaa' 
                 });
             }
@@ -243,7 +242,7 @@ const engines = {
                 const { display, timestamp } = parseDate(fullDate);
                 if (magnetUrl) {
                     results.push({ 
-                        title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                        title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
                         seeders: link.seeders, date: display, timestamp, source: '1337x' 
                     });
                 }
@@ -258,15 +257,21 @@ const engines = {
         const $ = cheerio.load(resp.data);
         const results = [];
         $('div.results dl').each((i, el) => {
-            const title = cleanTitle($(el).find('dt a').text());
-            const hash = $(el).find('dt a').attr('href')?.split('/')[1];
+            const linkEl = $(el).find('dt a');
+            const title = cleanTitle(linkEl.text());
+            
+            // Extract hash from href which is usually /hash or hash
+            let href = linkEl.attr('href') || "";
+            const hash = href.split('/').pop(); // Get last part
+
             const sizeStr = $(el).find('span.s').text().trim();
             const seeders = parseInt($(el).find('span.u').text()) || 0;
             const rawDate = $(el).find('span.d').text().trim();
             const { display, timestamp } = parseDate(rawDate);
-            if (title && hash) {
+            
+            if (title && hash && hash.length > 20) {
                 results.push({
-                    title, magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}`,
+                    title, magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}${TRACKERS}`,
                     size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                     seeders, date: display, timestamp, source: 'Torrentz2'
                 });
@@ -289,7 +294,7 @@ const engines = {
             const seeders = parseInt($(el).find('td:nth-child(5)').text()) || 0;
             if (title && magnetUrl) {
                 results.push({
-                    title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                    title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                     seeders, date: display, timestamp, source: 'Kickass'
                 });
             }
@@ -309,7 +314,7 @@ const engines = {
             const { display, timestamp } = parseDate(rawDate);
             if (title && magnetUrl) {
                 results.push({
-                    title, magnetUrl, size: 'Game Repack', sizeBytes: 0,
+                    title, magnetUrl: magnetUrl + TRACKERS, size: 'Game Repack', sizeBytes: 0,
                     seeders: 999, date: display, timestamp, source: 'FitGirl (Games)'
                 });
             }
@@ -340,7 +345,7 @@ const engines = {
                 const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {
                     results.push({ 
-                        title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                        title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
                         date: display, timestamp, seeders: link.seeders, source: 'Torrent9 (FR)' 
                     });
                 }
@@ -372,7 +377,7 @@ const engines = {
                 const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {
                     results.push({ 
-                        title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                        title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
                         date: display, timestamp, seeders: link.seeders, source: 'OxTorrent (FR)' 
                     });
                 }
