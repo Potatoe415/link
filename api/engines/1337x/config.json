@@ -1,0 +1,17 @@
+{
+  "id": "1337x",
+  "name": "1337x",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://1337x.to/search/{{q}}/1/",
+    "base": "https://1337x.to"
+  },
+  "selectors": {
+    "rows": "table.table-list tbody tr",
+    "title": "td.coll-1.name a:last-child",
+    "size": "td.coll-4.size",
+    "date": "td.coll-date",
+    "seeders": "td.coll-2.seeds",
+    "magnet": "a[href^=\"magnet:\"]"
+  }
+}

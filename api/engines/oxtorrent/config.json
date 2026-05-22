@@ -1,0 +1,16 @@
+{
+  "id": "oxtorrent",
+  "name": "OxTorrent (FR)",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://www.oxtorrent.town/recherche/{{q}}",
+    "base": "https://www.oxtorrent.town"
+  },
+  "selectors": {
+    "rows": "table.table-hover tbody tr",
+    "title": "a",
+    "size": "td:nth-child(2)",
+    "seeders": "td:nth-child(3)",
+    "magnet": "a[href^=\"magnet:\"]"
+  }
+}

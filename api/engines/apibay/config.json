@@ -1,0 +1,19 @@
+{
+  "id": "apibay",
+  "name": "The Pirate Bay (API)",
+  "type": "api",
+  "urls": {
+    "primary": "https://apibay.org/q.php?q={{q}}",
+    "mirrors": [
+      "https://tpb.party/search/{{q}}/1/99/0",
+      "https://thepiratebay10.org/search/{{q}}/1/99/0"
+    ]
+  },
+  "selectors": {
+    "rows": "table#searchResult tr",
+    "title": "div.detName a, a.detLink",
+    "magnet": "a[href^=\"magnet:\"]",
+    "seeders": "td:nth-last-child(2)",
+    "description": "font.detDesc, .detDesc"
+  }
+}

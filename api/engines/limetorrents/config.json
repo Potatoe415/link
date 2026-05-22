@@ -1,0 +1,16 @@
+{
+  "id": "limetorrents",
+  "name": "LimeTorrents",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://www.limetorrents.to/search/all/{{q}}/"
+  },
+  "selectors": {
+    "rows": "table.table2 tr.table-toggle",
+    "title": "div.tt-name a:nth-child(2)",
+    "magnet": "td.tdnormal:nth-of-type(3) a.csbuttons[href^=\"magnet:\"]",
+    "size": "td.tdnormal:nth-of-type(2)",
+    "date": "td.tdnormal:nth-of-type(1)",
+    "seeders": "td.tdseed"
+  }
+}

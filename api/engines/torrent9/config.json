@@ -1,0 +1,16 @@
+{
+  "id": "torrent9",
+  "name": "Torrent9 (FR)",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://www.torrent9.to/recherche/{{q}}",
+    "base": "https://www.torrent9.to"
+  },
+  "selectors": {
+    "rows": "table.table-hover tbody tr",
+    "title": "a",
+    "size": "td:nth-child(2)",
+    "seeders": "td:nth-child(3)",
+    "magnet": "a[href^=\"magnet:\"]"
+  }
+}

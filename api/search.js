@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import he from 'he';
+import { ENGINE_CONFIGS } from './engines/index.js';
 
 const formatSize = (bytes) => {
   if (!bytes || isNaN(bytes)) return '0 B';
@@ -32,11 +33,9 @@ const parseDate = (dateStr) => {
     const s = dateStr.toLowerCase().trim();
     let d = new Date(s);
 
-    // If it's a number (timestamp)
     if (!isNaN(s) && !isNaN(parseFloat(s))) {
         d = new Date(parseInt(s));
     } 
-    // Handle relative dates like "2 days ago", "5 hours", "1 month"
     else if (s.includes('day') || s.includes('hour') || s.includes('min') || s.includes('month') || s.includes('year') || s.includes('week')) {
         const num = parseInt(s.match(/\d+/)?.[0]);
         if (!isNaN(num)) {
@@ -56,10 +55,7 @@ const parseDate = (dateStr) => {
     }
 
     if (isNaN(d.getTime())) return { display: dateStr, timestamp: 0 };
-    return { 
-        display: d.toISOString().split('T')[0], 
-        timestamp: d.getTime() 
-    };
+    return { display: d.toISOString().split('T')[0], timestamp: d.getTime() };
 };
 
 const parseSizeBytes = (sizeStr) => {
@@ -92,8 +88,9 @@ const TRACKERS = [
 
 const engines = {
   apibay: async (q) => {
+    const config = ENGINE_CONFIGS.apibay;
     try {
-        const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 4000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 4000, headers: COMMON_HEADERS });
         if (Array.isArray(resp.data) && resp.data.length > 0 && resp.data[0].id !== "0") {
             return resp.data
                 .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
@@ -109,34 +106,23 @@ const engines = {
         }
     } catch (e) {}
 
-    const mirrors = [
-        'https://tpb.party',
-        'https://thepiratebay10.org',
-        'https://piratebayproxy.net'
-    ];
-
-    for (const mirror of mirrors) {
+    for (const mirrorBase of config.urls.mirrors) {
         try {
-            const url = `${mirror}/search/${encodeURIComponent(q)}/1/99/0`;
+            const url = mirrorBase.replace('{{q}}', encodeURIComponent(q));
             const proxyResp = await axios.get(url, { timeout: 6000, headers: COMMON_HEADERS });
             const $ = cheerio.load(proxyResp.data);
             const results = [];
-            $('table#searchResult tr').each((i, el) => {
+            $(config.selectors.rows).each((i, el) => {
                 if (i === 0) return;
-                const linkEl = $(el).find('div.detName a, a.detLink').first();
+                const linkEl = $(el).find(config.selectors.title).first();
                 const title = cleanTitle(linkEl.text());
-                const magnetUrl = $(el).find('a[href^="magnet:"]').attr('href');
-                const seeders = parseInt($(el).find('td:nth-last-child(2)').text()) || 0;
-                const descText = $(el).find('font.detDesc, .detDesc').text();
-                
-                // Better regex for size and date
+                const magnetUrl = $(el).find(config.selectors.magnet).attr('href');
+                const seeders = parseInt($(el).find(config.selectors.seeders).text()) || 0;
+                const descText = $(el).find(config.selectors.description).text();
                 const sizeMatch = descText.match(/Size\s+([\d.]+\s+[A-Z]+i?B)/i);
                 const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : 'N/A';
-                
                 const dateMatch = descText.match(/Uploaded\s+([\d\s-:]+)/i);
-                const rawDate = dateMatch ? dateMatch[1].split(',')[0] : null;
-                const { display, timestamp } = parseDate(rawDate);
-
+                const { display, timestamp } = parseDate(dateMatch ? dateMatch[1].split(',')[0] : null);
                 if (title && magnetUrl && title.length > 2) {
                     results.push({
                         title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
@@ -150,17 +136,18 @@ const engines = {
     return [];
   },
   limetorrents: async (q) => {
+    const config = ENGINE_CONFIGS.limetorrents;
     try {
-        const resp = await axios.get(`https://www.limetorrents.to/search/all/${encodeURIComponent(q)}/`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const results = [];
-        $('table.table2 tr.table-toggle').each((i, el) => {
-            const title = cleanTitle($(el).find('div.tt-name a:nth-child(2)').text());
-            const magnetUrl = $(el).find('td.tdnormal:nth-of-type(3) a.csbuttons[href^="magnet:"]').attr('href');
-            const sizeStr = $(el).find('td.tdnormal:nth-of-type(2)').text().trim();
-            const rawDate = $(el).find('td.tdnormal:nth-of-type(1)').text().trim().split(' - ')[0];
+        $(config.selectors.rows).each((i, el) => {
+            const title = cleanTitle($(el).find(config.selectors.title).text());
+            const magnetUrl = $(el).find(config.selectors.magnet).attr('href');
+            const sizeStr = $(el).find(config.selectors.size).text().trim();
+            const rawDate = $(el).find(config.selectors.date).text().trim().split(' - ')[0];
             const { display, timestamp } = parseDate(rawDate);
-            const seeders = parseInt($(el).find('td.tdseed').text().trim()) || 0;
+            const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
             if (title && magnetUrl) {
                 results.push({ 
                     title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
@@ -172,8 +159,9 @@ const engines = {
     } catch (e) { return []; }
   },
   yts: async (q) => {
+    const config = ENGINE_CONFIGS.yts;
     try {
-        const resp = await axios.get(`https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         if (!resp.data?.data?.movies) return [];
         const results = [];
         resp.data.data.movies.forEach(movie => {
@@ -191,8 +179,9 @@ const engines = {
     } catch (e) { return []; }
   },
   solid: async (q) => {
+    const config = ENGINE_CONFIGS.solid;
     try {
-        const resp = await axios.get(`https://solidtorrents.net/api/v1/search?q=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         return (resp.data.results || []).map(item => {
             const { display, timestamp } = parseDate(item.createdAt);
             const title = cleanTitle(item.title);
@@ -204,17 +193,18 @@ const engines = {
     } catch (e) { return []; }
   },
   nyaa: async (q) => {
+    const config = ENGINE_CONFIGS.nyaa;
     try {
-        const resp = await axios.get(`https://nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const results = [];
-        $('tr.default, tr.success, tr.danger').each((i, el) => {
-            const title = cleanTitle($(el).find('td:nth-child(2) a:last-child').text());
-            const magnetUrl = $(el).find('td:nth-child(3) a[href^="magnet:"]').attr('href');
-            const sizeStr = $(el).find('td:nth-child(4)').text().trim();
-            const rawDate = $(el).find('td:nth-child(5)').text().trim().split(' ')[0];
+        $(config.selectors.rows).each((i, el) => {
+            const title = cleanTitle($(el).find(config.selectors.title).text());
+            const magnetUrl = $(el).find(config.selectors.magnet).attr('href');
+            const sizeStr = $(el).find(config.selectors.size).text().trim();
+            const rawDate = $(el).find(config.selectors.date).text().trim().split(' ')[0];
             const { display, timestamp } = parseDate(rawDate);
-            const seeders = parseInt($(el).find('td:nth-child(6)').text().trim()) || 0;
+            const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
             if (title && magnetUrl) {
                 results.push({ 
                     title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
@@ -226,17 +216,18 @@ const engines = {
     } catch (e) { return []; }
   },
   "1337x": async (q) => {
+    const config = ENGINE_CONFIGS['1337x'];
     try {
-        const resp = await axios.get(`https://1337x.to/search/${encodeURIComponent(q)}/1/`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const links = [];
-        $('table.table-list tbody tr').each((i, el) => {
-            const nameEl = $(el).find('td.coll-1.name a:last-child');
+        $(config.selectors.rows).each((i, el) => {
+            const nameEl = $(el).find(config.selectors.title);
             const title = cleanTitle(nameEl.text());
-            const detailUrl = "https://1337x.to" + nameEl.attr('href');
-            const sizeStr = $(el).find('td.coll-4.size').contents().first().text().trim();
-            const rawDate = $(el).find('td.coll-date').text().trim();
-            const seeders = parseInt($(el).find('td.coll-2.seeds').text().trim()) || 0;
+            const detailUrl = config.urls.base + nameEl.attr('href');
+            const sizeStr = $(el).find(config.selectors.size).contents().first().text().trim();
+            const rawDate = $(el).find(config.selectors.date).text().trim();
+            const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
             if (title && detailUrl) links.push({ title, detailUrl, sizeStr, seeders, rawDate });
         });
         const results = [];
@@ -259,18 +250,19 @@ const engines = {
     } catch (e) { return []; }
   },
   torrentz2: async (q) => {
+    const config = ENGINE_CONFIGS.torrentz2;
     try {
-        const resp = await axios.get(`https://torrentz2.nz/search?q=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const results = [];
-        $('div.results dl').each((i, el) => {
-            const linkEl = $(el).find('dt a');
+        $(config.selectors.rows).each((i, el) => {
+            const linkEl = $(el).find(config.selectors.title);
             const title = cleanTitle(linkEl.text());
             let href = linkEl.attr('href') || "";
             const hash = href.split('/').pop();
-            const sizeStr = $(el).find('span.s').text().trim();
-            const seeders = parseInt($(el).find('span.u').text()) || 0;
-            const rawDate = $(el).find('span.d').text().trim();
+            const sizeStr = $(el).find(config.selectors.size).text().trim();
+            const seeders = parseInt($(el).find(config.selectors.seeders).text()) || 0;
+            const rawDate = $(el).find(config.selectors.date).text().trim();
             const { display, timestamp } = parseDate(rawDate);
             if (title && hash && hash.length > 20) {
                 results.push({
@@ -284,17 +276,18 @@ const engines = {
     } catch (e) { return []; }
   },
   kickass: async (q) => {
+    const config = ENGINE_CONFIGS.kickass;
     try {
-        const resp = await axios.get(`https://kickasstorrents.to/usearch/${encodeURIComponent(q)}/`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const results = [];
-        $('table.data tr.odd, table.data tr.even').each((i, el) => {
-            const title = cleanTitle($(el).find('a.cellMainLink').text());
-            const magnetUrl = $(el).find('a[title="Torrent magnet link"]').attr('href');
-            const sizeStr = $(el).find('td:nth-child(2)').text().trim();
-            const rawDate = $(el).find('td:nth-child(4)').text().trim();
+        $(config.selectors.rows).each((i, el) => {
+            const title = cleanTitle($(el).find(config.selectors.title).text());
+            const magnetUrl = $(el).find(config.selectors.magnet).attr('href');
+            const sizeStr = $(el).find(config.selectors.size).text().trim();
+            const rawDate = $(el).find(config.selectors.date).text().trim();
             const { display, timestamp } = parseDate(rawDate);
-            const seeders = parseInt($(el).find('td:nth-child(5)').text()) || 0;
+            const seeders = parseInt($(el).find(config.selectors.seeders).text()) || 0;
             if (title && magnetUrl) {
                 results.push({
                     title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
@@ -306,14 +299,15 @@ const engines = {
     } catch (e) { return []; }
   },
   fitgirl: async (q) => {
+    const config = ENGINE_CONFIGS.fitgirl;
     try {
-        const resp = await axios.get(`https://fitgirl-repacks.site/?s=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const results = [];
-        $('article').each((i, el) => {
-            const title = cleanTitle($(el).find('h1.entry-title a').text());
-            const magnetUrl = $(el).find('a[href^="magnet:"]').first().attr('href');
-            const rawDate = $(el).find('time.entry-date').attr('datetime');
+        $(config.selectors.rows).each((i, el) => {
+            const title = cleanTitle($(el).find(config.selectors.title).text());
+            const magnetUrl = $(el).find(config.selectors.magnet).first().attr('href');
+            const rawDate = $(el).find(config.selectors.date).attr('datetime');
             const { display, timestamp } = parseDate(rawDate);
             if (title && magnetUrl) {
                 results.push({
@@ -326,16 +320,17 @@ const engines = {
     } catch (e) { return []; }
   },
   torrent9: async (q) => {
+    const config = ENGINE_CONFIGS.torrent9;
     try {
-        const resp = await axios.get(`https://www.torrent9.to/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const detailLinks = [];
-        $('table.table-hover tbody tr').each((i, el) => {
-            const linkEl = $(el).find('a').first();
+        $(config.selectors.rows).each((i, el) => {
+            const linkEl = $(el).find(config.selectors.title).first();
             const title = cleanTitle(linkEl.text());
-            const detailUrl = "https://www.torrent9.to" + linkEl.attr('href');
-            const sizeStr = $(el).find('td:nth-child(2)').text().trim();
-            const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
+            const detailUrl = config.urls.base + linkEl.attr('href');
+            const sizeStr = $(el).find(config.selectors.size).text().trim();
+            const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
             if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
         });
         const results = [];
@@ -343,7 +338,7 @@ const engines = {
             try {
                 const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
                 const $$ = cheerio.load(detailResp.data);
-                const magnetUrl = $$('a[href^="magnet:"]').attr('href');
+                const magnetUrl = $$(config.selectors.magnet).attr('href');
                 const rawDate = $$('.start-session').text().split(':').pop().trim();
                 const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {
@@ -358,16 +353,17 @@ const engines = {
     } catch (e) { return []; }
   },
   oxtorrent: async (q) => {
+    const config = ENGINE_CONFIGS.oxtorrent;
     try {
-        const resp = await axios.get(`https://www.oxtorrent.town/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
         const $ = cheerio.load(resp.data);
         const detailLinks = [];
-        $('table.table-hover tbody tr').each((i, el) => {
-            const linkEl = $(el).find('a').first();
+        $(config.selectors.rows).each((i, el) => {
+            const linkEl = $(el).find(config.selectors.title).first();
             const title = cleanTitle(linkEl.text());
-            const detailUrl = "https://www.oxtorrent.town" + linkEl.attr('href');
-            const sizeStr = $(el).find('td:nth-child(2)').text().trim();
-            const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
+            const detailUrl = config.urls.base + linkEl.attr('href');
+            const sizeStr = $(el).find(config.selectors.size).text().trim();
+            const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
             if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
         });
         const results = [];
@@ -375,7 +371,7 @@ const engines = {
             try {
                 const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
                 const $$ = cheerio.load(detailResp.data);
-                const magnetUrl = $$('a[href^="magnet:"]').attr('href');
+                const magnetUrl = $$(config.selectors.magnet).attr('href');
                 const rawDate = $$('.start-session').text().split(':').pop().trim();
                 const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {

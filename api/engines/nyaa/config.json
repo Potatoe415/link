@@ -1,0 +1,16 @@
+{
+  "id": "nyaa",
+  "name": "Nyaa (Anime)",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://nyaa.si/?f=0&c=0_0&q={{q}}"
+  },
+  "selectors": {
+    "rows": "tr.default, tr.success, tr.danger",
+    "title": "td:nth-child(2) a:last-child",
+    "magnet": "td:nth-child(3) a[href^=\"magnet:\"]",
+    "size": "td:nth-child(4)",
+    "date": "td:nth-child(5)",
+    "seeders": "td:nth-child(6)"
+  }
+}

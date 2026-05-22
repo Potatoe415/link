@@ -1,0 +1,8 @@
+{
+  "id": "solid",
+  "name": "SolidTorrents",
+  "type": "api",
+  "urls": {
+    "primary": "https://solidtorrents.net/api/v1/search?q={{q}}"
+  }
+}

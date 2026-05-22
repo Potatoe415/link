@@ -1,0 +1,15 @@
+{
+  "id": "torrentz2",
+  "name": "Torrentz2",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://torrentz2.nz/search?q={{q}}"
+  },
+  "selectors": {
+    "rows": "div.results dl",
+    "title": "dt a",
+    "size": "span.s",
+    "seeders": "span.u",
+    "date": "span.d"
+  }
+}

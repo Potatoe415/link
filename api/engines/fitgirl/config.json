@@ -1,0 +1,14 @@
+{
+  "id": "fitgirl",
+  "name": "FitGirl (Games)",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://fitgirl-repacks.site/?s={{q}}"
+  },
+  "selectors": {
+    "rows": "article",
+    "title": "h1.entry-title a",
+    "magnet": "a[href^=\"magnet:\"]",
+    "date": "time.entry-date"
+  }
+}

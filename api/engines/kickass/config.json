@@ -1,0 +1,16 @@
+{
+  "id": "kickass",
+  "name": "Kickass (KAT)",
+  "type": "scraper",
+  "urls": {
+    "primary": "https://kickasstorrents.to/usearch/{{q}}/"
+  },
+  "selectors": {
+    "rows": "table.data tr.odd, table.data tr.even",
+    "title": "a.cellMainLink",
+    "magnet": "a[title=\"Torrent magnet link\"]",
+    "size": "td:nth-child(2)",
+    "date": "td:nth-child(4)",
+    "seeders": "td:nth-child(5)"
+  }
+}
