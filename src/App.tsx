@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Settings, Check, Terminal, ChevronUp, ChevronDown, Activity, AlertCircle } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Settings, Check, Terminal, ChevronUp, ChevronDown, Activity, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import SearchBar from "./components/SearchBar";
 import ResultList from "./components/ResultList";
 import { TorrentResult } from "./types";
@@ -15,6 +15,8 @@ const ENGINES = [
   { id: 'torrent9', name: 'Torrent9 (FR)' },
   { id: 'oxtorrent', name: 'OxTorrent (FR)' },
 ];
+
+const ITEMS_PER_PAGE = 100;
 
 interface DebugInfo {
   totalTime: number;
@@ -36,6 +38,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [selectedEngines, setSelectedEngines] = useState<string[]>(ENGINES.map(e => e.id));
   const [sortBy, setSortBy] = useState<SortOption>('seeders');
+  const [currentPage, setCurrentPage] = useState(1);
   
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
@@ -48,6 +51,18 @@ function App() {
       if (sortBy === 'date') return b.timestamp - a.timestamp;
       return 0;
     });
+  }, [results, sortBy]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(sortedResults.length / ITEMS_PER_PAGE);
+  const paginatedResults = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return sortedResults.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedResults, currentPage]);
+
+  // Reset page when search results or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
   }, [results, sortBy]);
 
   const toggleEngine = (id: string) => {
@@ -103,7 +118,7 @@ function App() {
 
       <SearchBar onSearch={handleSearch} isLoading={loading} />
 
-      {/* Sorting Tabs - Client Side Only */}
+      {/* Sorting Tabs */}
       {results.length > 0 && (
         <div className="flex items-center gap-1 sm:gap-2 mt-8 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
           {[
@@ -134,9 +149,35 @@ function App() {
         </div>
       )}
 
-      <ResultList results={sortedResults} onDownload={handleDownload} />
+      <ResultList results={paginatedResults} onDownload={handleDownload} />
 
-      {/* Floating Settings Button (Bottom Left) */}
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-10 flex items-center gap-4 bg-slate-800/80 p-2 rounded-2xl border border-slate-700">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-xl hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          
+          <div className="text-sm font-medium text-slate-300 px-2">
+            Page <span className="text-blue-500 font-bold">{currentPage}</span> / {totalPages}
+            <span className="ml-2 text-slate-500 hidden sm:inline">({results.length} total)</span>
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-xl hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight size={24} />
+          </button>
+        </div>
+      )}
+
+      {/* Floating Settings Button */}
       <div className="fixed left-4 bottom-14 z-[110]">
         {showSettings && (
           <div className="absolute bottom-full left-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
