@@ -116,17 +116,25 @@ const engines = {
                 if (i === 0) return;
                 const linkEl = $(el).find(config.selectors.title).first();
                 const title = cleanTitle(linkEl.text());
-                const magnetUrl = $(el).find(config.selectors.magnet).attr('href');
+                const magnetRaw = $(el).find(config.selectors.magnet).attr('href');
                 const seeders = parseInt($(el).find(config.selectors.seeders).text()) || 0;
                 const descText = $(el).find(config.selectors.description).text();
                 const sizeMatch = descText.match(/Size\s+([\d.]+\s+[A-Z]+i?B)/i);
-                const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : 'N/A';
+                const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : null;
+                const sizeBytes = parseSizeBytes(sizeStr);
                 const dateMatch = descText.match(/Uploaded\s+([\d\s-:]+)/i);
                 const { display, timestamp } = parseDate(dateMatch ? dateMatch[1].split(',')[0] : null);
-                if (title && magnetUrl && title.length > 2) {
+
+                // Validate all fields before accepting a scraped result
+                const magnetOk = typeof magnetRaw === 'string' && magnetRaw.startsWith('magnet:?xt=urn:btih:') && magnetRaw.length >= 52;
+                const titleOk  = typeof title === 'string' && title.length >= 3 && !title.startsWith('magnet:');
+                const sizeOk   = sizeStr !== null && sizeBytes > 0;
+                const dateOk   = display !== 'N/A' && timestamp > 0;
+
+                if (magnetOk && titleOk && sizeOk && dateOk) {
                     results.push({
-                        title, magnetUrl: magnetUrl + TRACKERS, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
-                        seeders, date: display, timestamp, source: `PirateBay (Mirror)`
+                        title, magnetUrl: magnetRaw + TRACKERS, size: sizeStr, sizeBytes,
+                        seeders, date: display, timestamp, source: 'PirateBay (Mirror)'
                     });
                 }
             });
