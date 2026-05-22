@@ -1,25 +1,16 @@
-import apibay from './apibay.json' assert { type: 'json' };
-import limetorrents from './limetorrents.json' assert { type: 'json' };
-import yts from './yts.json' assert { type: 'json' };
-import solid from './solid.json' assert { type: 'json' };
-import nyaa from './nyaa.json' assert { type: 'json' };
-import x1337 from './1337x.json' assert { type: 'json' };
-import torrentz2 from './torrentz2.json' assert { type: 'json' };
-import kickass from './kickass.json' assert { type: 'json' };
-import fitgirl from './fitgirl.json' assert { type: 'json' };
-import torrent9 from './torrent9.json' assert { type: 'json' };
-import oxtorrent from './oxtorrent.json' assert { type: 'json' };
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
 export const ENGINE_CONFIGS = {
-  apibay,
-  limetorrents,
-  yts,
-  solid,
-  nyaa,
-  '1337x': x1337,
-  torrentz2,
-  kickass,
-  fitgirl,
-  torrent9,
-  oxtorrent
+  apibay:       require('./apibay.json'),
+  limetorrents: require('./limetorrents.json'),
+  yts:          require('./yts.json'),
+  solid:        require('./solid.json'),
+  nyaa:         require('./nyaa.json'),
+  '1337x':      require('./1337x.json'),
+  torrentz2:    require('./torrentz2.json'),
+  kickass:      require('./kickass.json'),
+  fitgirl:      require('./fitgirl.json'),
+  torrent9:     require('./torrent9.json'),
+  oxtorrent:    require('./oxtorrent.json'),
 };
