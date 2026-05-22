@@ -1,5 +1,5 @@
 import React from 'react';
-import { Magnet } from 'lucide-react';
+import { Magnet, Calendar } from 'lucide-react';
 import { TorrentResult } from '../types';
 
 interface ResultItemProps {
@@ -22,6 +22,10 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, onDownload }) => {
         </h3>
         <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-[11px] sm:text-sm text-slate-400">
           <span className="whitespace-nowrap">{result.size}</span>
+          <span className="flex items-center gap-1 whitespace-nowrap">
+            <Calendar size={12} className="sm:w-3.5 sm:h-3.5" />
+            {result.date}
+          </span>
           <span className={`flex items-center gap-1 font-bold whitespace-nowrap ${getSeederColor(result.seeders)}`}>
             {result.seeders} <span className="hidden xs:inline">seeders</span>
           </span>

@@ -4,4 +4,5 @@ export interface TorrentResult {
   size: string;
   seeders: number;
   source: string;
+  date: string;
 }

@@ -19,6 +19,17 @@ const cleanTitle = (str) => {
   return he.decode(str).trim();
 };
 
+const formatDate = (dateInput) => {
+    if (!dateInput) return 'N/A';
+    try {
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return dateInput; // Return raw if parsing fails
+        return d.toISOString().split('T')[0];
+    } catch (e) {
+        return dateInput;
+    }
+};
+
 const engines = {
   apibay: async (q) => {
     const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 8000 });
@@ -31,6 +42,7 @@ const engines = {
           magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}`,
           size: formatSize(item.size),
           seeders: parseInt(item.seeders) || 0,
+          date: item.added ? formatDate(parseInt(item.added) * 1000) : 'N/A',
           source: 'Apibay'
         };
       });
@@ -47,8 +59,9 @@ const engines = {
       const title = cleanTitle(rawTitle);
       const magnetUrl = $(el).find('td.tdnormal:nth-of-type(3) a.csbuttons[href^="magnet:"]').attr('href');
       const size = $(el).find('td.tdnormal:nth-of-type(2)').text().trim();
+      const date = $(el).find('td.tdnormal:nth-of-type(1)').text().trim().split(' - ')[0] || 'N/A';
       const seeders = parseInt($(el).find('td.tdseed').text().trim()) || 0;
-      if (title && magnetUrl) results.push({ title, magnetUrl, size, seeders, source: 'LimeTorrents' });
+      if (title && magnetUrl) results.push({ title, magnetUrl, size, seeders, date, source: 'LimeTorrents' });
     });
     return results;
   },
@@ -64,6 +77,7 @@ const engines = {
           magnetUrl: `magnet:?xt=urn:btih:${t.hash}&dn=${encodeURIComponent(title)}`,
           size: t.size,
           seeders: t.seeds,
+          date: movie.date_uploaded ? movie.date_uploaded.split(' ')[0] : 'N/A',
           source: 'YTS'
         });
       });
@@ -77,6 +91,7 @@ const engines = {
       magnetUrl: item.magnet,
       size: formatSize(item.size),
       seeders: item.swarm.seeders,
+      date: formatDate(item.createdAt),
       source: 'Solid'
     }));
   },
@@ -88,8 +103,9 @@ const engines = {
         const title = cleanTitle($(el).find('td:nth-child(2) a:last-child').text());
         const magnetUrl = $(el).find('td:nth-child(3) a[href^="magnet:"]').attr('href');
         const size = $(el).find('td:nth-child(4)').text().trim();
+        const date = $(el).find('td:nth-child(5)').text().trim().split(' ')[0] || 'N/A';
         const seeders = parseInt($(el).find('td:nth-child(6)').text().trim()) || 0;
-        if (title && magnetUrl) results.push({ title, magnetUrl, size, seeders, source: 'Nyaa' });
+        if (title && magnetUrl) results.push({ title, magnetUrl, size, seeders, date, source: 'Nyaa' });
     });
     return results;
   },
@@ -101,8 +117,9 @@ const engines = {
         const title = cleanTitle($(el).find('td.coll-1.name a:last-child').text());
         const detailUrl = "https://1337x.to" + $(el).find('td.coll-1.name a:last-child').attr('href');
         const size = $(el).find('td.coll-4.size').contents().first().text().trim();
+        const date = $(el).find('td.coll-date').text().trim() || 'N/A';
         const seeders = parseInt($(el).find('td.coll-2.seeds').text().trim()) || 0;
-        if (title && detailUrl) links.push({ title, detailUrl, size, seeders });
+        if (title && detailUrl) links.push({ title, detailUrl, size, seeders, date });
     });
 
     const results = [];
@@ -125,7 +142,9 @@ const engines = {
         const detailUrl = "https://www.torrent9.to" + $(el).find('a').attr('href');
         const size = $(el).find('td:nth-child(2)').text().trim();
         const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
-        if (title && detailUrl) detailLinks.push({ title, detailUrl, size, seeders });
+        // French sites usually don't show date in results table, or it's implied recent. 
+        // We'll mark as N/A or try to find it.
+        if (title && detailUrl) detailLinks.push({ title, detailUrl, size, seeders, date: 'N/A' });
     });
     const results = [];
     for (const link of detailLinks.slice(0, 3)) {
@@ -133,7 +152,9 @@ const engines = {
             const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').attr('href');
-            if (magnetUrl) results.push({ ...link, magnetUrl, source: 'Torrent9 (FR)' });
+            // Try to find date in detail page
+            const date = $$('.start-session').text().split(':').pop().trim() || 'N/A';
+            if (magnetUrl) results.push({ ...link, magnetUrl, date, source: 'Torrent9 (FR)' });
         } catch (e) {}
     }
     return results;
@@ -147,7 +168,7 @@ const engines = {
         const detailUrl = "https://www.oxtorrent.town" + $(el).find('a').attr('href');
         const size = $(el).find('td:nth-child(2)').text().trim();
         const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
-        if (title && detailUrl) detailLinks.push({ title, detailUrl, size, seeders });
+        if (title && detailUrl) detailLinks.push({ title, detailUrl, size, seeders, date: 'N/A' });
     });
     const results = [];
     for (const link of detailLinks.slice(0, 3)) {
@@ -155,7 +176,8 @@ const engines = {
             const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').attr('href');
-            if (magnetUrl) results.push({ ...link, magnetUrl, source: 'OxTorrent (FR)' });
+            const date = $$('.start-session').text().split(':').pop().trim() || 'N/A';
+            if (magnetUrl) results.push({ ...link, magnetUrl, date, source: 'OxTorrent (FR)' });
         } catch (e) {}
     }
     return results;
