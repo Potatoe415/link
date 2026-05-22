@@ -16,7 +16,8 @@ const formatSize = (bytes) => {
 
 const cleanTitle = (str) => {
   if (!str) return 'Unknown';
-  return he.decode(str).trim();
+  // Remove technical residues that might have been scraped
+  return he.decode(str).replace(/import \{.*\} from .*/g, '').trim();
 };
 
 const formatDate = (dateInput) => {
@@ -40,57 +41,70 @@ const parseSizeBytes = (sizeStr) => {
     return val;
 };
 
-// Advanced headers to mimic a real high-end browser
 const COMMON_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Accept': 'application/json, text/plain, */*',
-  'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-  'Referer': 'https://www.google.com/',
-  'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-  'Sec-Ch-Ua-Mobile': '?0',
-  'Sec-Ch-Ua-Platform': '"Windows"',
-  'Sec-Fetch-Dest': 'empty',
-  'Sec-Fetch-Mode': 'cors',
-  'Sec-Fetch-Site': 'same-origin'
+  'Accept': 'text/html,application/json,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7'
 };
 
 const engines = {
   apibay: async (q) => {
-    // Mirror rotation for Apibay (The Pirate Bay)
-    const mirrors = [
-        `https://apibay.org/q.php?q=${encodeURIComponent(q)}`,
-        `https://tpb.party/ajax/q.php?q=${encodeURIComponent(q)}`,
-        `https://thepiratebay10.org/ajax/q.php?q=${encodeURIComponent(q)}`
-    ];
-
-    let lastError = null;
-    for (const url of mirrors) {
-        try {
-            const resp = await axios.get(url, { timeout: 6000, headers: COMMON_HEADERS });
-            if (Array.isArray(resp.data)) {
-                return resp.data
-                    .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
-                    .map(item => {
-                        const title = cleanTitle(item.name);
-                        const { display, timestamp } = formatDate(item.added ? parseInt(item.added) * 1000 : null);
-                        return {
-                            title,
-                            magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}`,
-                            size: formatSize(item.size),
-                            sizeBytes: parseInt(item.size) || 0,
-                            seeders: parseInt(item.seeders) || 0,
-                            date: display,
-                            timestamp,
-                            source: 'Apibay'
-                        };
-                    });
-            }
-        } catch (e) {
-            lastError = e;
-            continue; // Try next mirror
+    // 1. Try official Apibay API first
+    try {
+        const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 5000, headers: COMMON_HEADERS });
+        if (Array.isArray(resp.data)) {
+            return resp.data
+                .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
+                .map(item => {
+                    const title = cleanTitle(item.name);
+                    const { display, timestamp } = formatDate(item.added ? parseInt(item.added) * 1000 : null);
+                    return {
+                        title,
+                        magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}`,
+                        size: formatSize(item.size),
+                        sizeBytes: parseInt(item.size) || 0,
+                        seeders: parseInt(item.seeders) || 0,
+                        date: display,
+                        timestamp,
+                        source: 'Apibay'
+                    };
+                });
         }
+    } catch (e) {
+        console.log("Apibay API failed, falling back to proxy scraping...");
     }
-    throw lastError || new Error("All mirrors failed");
+
+    // 2. Fallback: Scrape a TPB Proxy (more reliable on Vercel)
+    try {
+        const proxyResp = await axios.get(`https://tpb.party/search/${encodeURIComponent(q)}/1/99/0`, { timeout: 7000, headers: COMMON_HEADERS });
+        const $ = cheerio.load(proxyResp.data);
+        const results = [];
+        
+        $('table#searchResult tr').each((i, el) => {
+            if (i === 0) return; // Skip header
+            const title = cleanTitle($(el).find('div.detName a').text());
+            const magnetUrl = $(el).find('a[href^="magnet:"]').attr('href');
+            const seeders = parseInt($(el).find('td:nth-last-child(2)').text()) || 0;
+            const descText = $(el).find('font.detDesc').text();
+            
+            // Extract size and date from text like "Uploaded 05-22 10:30, Size 2.4 GiB, ULed by ..."
+            const sizeMatch = descText.match(/Size ([\d.]+\s+[KMG]iB)/);
+            const sizeStr = sizeMatch ? sizeMatch[1].replace('GiB', 'GB').replace('MiB', 'MB') : 'N/A';
+            
+            const dateMatch = descText.match(/Uploaded ([\d-]+)/);
+            const { display, timestamp } = formatDate(dateMatch ? dateMatch[1] : null);
+
+            if (title && magnetUrl) {
+                results.push({
+                    title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                    seeders, date: display, timestamp, source: 'PirateBay (Proxy)'
+                });
+            }
+        });
+        return results;
+    } catch (e) {
+        throw new Error("PirateBay API and Mirrors both failed");
+    }
   },
   limetorrents: async (q) => {
     const resp = await axios.get(`https://www.limetorrents.to/search/all/${encodeURIComponent(q)}/`, { 
@@ -192,6 +206,64 @@ const engines = {
                 results.push({ 
                     title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
                     seeders: link.seeders, date: display, timestamp, source: '1337x' 
+                });
+            }
+        } catch (e) {}
+    }
+    return results;
+  },
+  torrent9: async (q) => {
+    const resp = await axios.get(`https://www.torrent9.to/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+    const $ = cheerio.load(resp.data);
+    const detailLinks = [];
+    $('table.table-hover tbody tr').each((i, el) => {
+        const title = cleanTitle($(el).find('a').text());
+        const detailUrl = "https://www.torrent9.to" + $(el).find('a').attr('href');
+        const sizeStr = $(el).find('td:nth-child(2)').text().trim();
+        const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
+        if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
+    });
+    const results = [];
+    for (const link of detailLinks.slice(0, 3)) {
+        try {
+            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
+            const $$ = cheerio.load(detailResp.data);
+            const magnetUrl = $$('a[href^="magnet:"]').attr('href');
+            const rawDate = $$('.start-session').text().split(':').pop().trim();
+            const { display, timestamp } = formatDate(rawDate);
+            if (magnetUrl) {
+                results.push({ 
+                    title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                    date: display, timestamp, seeders: link.seeders, source: 'Torrent9 (FR)' 
+                });
+            }
+        } catch (e) {}
+    }
+    return results;
+  },
+  oxtorrent: async (q) => {
+    const resp = await axios.get(`https://www.oxtorrent.town/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+    const $ = cheerio.load(resp.data);
+    const detailLinks = [];
+    $('table.table-hover tbody tr').each((i, el) => {
+        const title = cleanTitle($(el).find('a').text());
+        const detailUrl = "https://www.oxtorrent.town" + $(el).find('a').attr('href');
+        const sizeStr = $(el).find('td:nth-child(2)').text().trim();
+        const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
+        if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
+    });
+    const results = [];
+    for (const link of detailLinks.slice(0, 3)) {
+        try {
+            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
+            const $$ = cheerio.load(detailResp.data);
+            const magnetUrl = $$('a[href^="magnet:"]').attr('href');
+            const rawDate = $$('.start-session').text().split(':').pop().trim();
+            const { display, timestamp } = formatDate(rawDate);
+            if (magnetUrl) {
+                results.push({ 
+                    title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                    date: display, timestamp, seeders: link.seeders, source: 'OxTorrent (FR)' 
                 });
             }
         } catch (e) {}
