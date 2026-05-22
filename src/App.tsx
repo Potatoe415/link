@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Settings, Check, Terminal, ChevronUp, ChevronDown, Activity, AlertCircle, ChevronLeft, ChevronRight, Lock } from "lucide-react";
+import { Settings, Check, Terminal, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import SearchBar from "./components/SearchBar";
 import ResultList from "./components/ResultList";
 import { TorrentResult } from "./types";
@@ -19,7 +19,7 @@ const ENGINES = [
   { id: 'oxtorrent', name: 'OxTorrent (FR)' },
 ];
 
-const ITEMS_PER_PAGE = 100;
+const ITEMS_PER_PAGE = 50;
 
 interface DebugInfo {
   totalTime: number;
@@ -133,12 +133,12 @@ function App() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 font-sans text-white">
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl text-center relative overflow-hidden">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl text-center relative overflow-hidden text-white font-sans">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
           <div className="inline-flex p-4 rounded-full bg-blue-600/10 text-blue-500 mb-6">
             <Lock size={32} />
           </div>
-          <h1 className="text-3xl font-bold mb-2 tracking-tight">Access <span className="text-blue-500">Locked</span></h1>
+          <h1 className="text-3xl font-bold mb-2 tracking-tight text-white">Access <span className="text-blue-500 text-white">Locked</span></h1>
           <p className="text-slate-400 mb-8 text-sm">Please enter the security password</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <input
@@ -229,26 +229,34 @@ function App() {
         </div>
       )}
 
-      {/* Floating Settings Button */}
+      {/* Floating Settings Button & Logic */}
       <div className="fixed right-4 bottom-14 z-[110]">
         {showSettings && (
-          <div className="absolute bottom-full right-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Search Engines</h3>
-            <div className="space-y-1 sm:space-y-2">
-              {ENGINES.map(engine => (
-                <button
-                  key={engine.id}
-                  onClick={() => toggleEngine(engine.id)}
-                  className="w-full flex items-center justify-between p-2.5 sm:p-2 rounded-lg hover:bg-slate-700 transition-colors group"
-                >
-                  <span className={selectedEngines.includes(engine.id) ? "text-white" : "text-slate-500"}>
-                    {engine.name}
-                  </span>
-                  {selectedEngines.includes(engine.id) && <Check size={18} className="text-blue-500" />}
-                </button>
-              ))}
+          <>
+            {/* Click-outside backdrop */}
+            <div 
+              className="fixed inset-0 z-[-1] cursor-default" 
+              onClick={() => setShowSettings(false)}
+            />
+            
+            <div className="absolute bottom-full right-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Search Engines</h3>
+              <div className="space-y-1 sm:space-y-2">
+                {ENGINES.map(engine => (
+                  <button
+                    key={engine.id}
+                    onClick={() => toggleEngine(engine.id)}
+                    className="w-full flex items-center justify-between p-2.5 sm:p-2 rounded-lg hover:bg-slate-700 transition-colors group"
+                  >
+                    <span className={selectedEngines.includes(engine.id) ? "text-white" : "text-slate-500"}>
+                      {engine.name}
+                    </span>
+                    {selectedEngines.includes(engine.id) && <Check size={18} className="text-blue-500" />}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          </>
         )}
         <button 
           onClick={() => setShowSettings(!showSettings)}
