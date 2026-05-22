@@ -14,6 +14,13 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, onDownload }) => {
     return 'text-red-400';
   };
 
+  const formatSeeders = (num: number) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
   return (
     <div 
       onClick={() => onDownload(result.magnetUrl)}
@@ -34,7 +41,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, onDownload }) => {
           </span>
           <span className={`flex items-center gap-1.5 font-bold whitespace-nowrap ${getSeederColor(result.seeders)}`}>
             <Users size={13} />
-            {result.seeders} <span className="hidden xs:inline text-[10px] font-normal opacity-70">seeders</span>
+            {formatSeeders(result.seeders)} <span className="hidden xs:inline text-[10px] font-normal opacity-70">seeders</span>
           </span>
           <span className="bg-slate-700 px-1.5 py-0.5 rounded text-[10px] sm:text-xs truncate max-w-[80px] sm:max-w-none text-slate-300">{result.source}</span>
         </div>
