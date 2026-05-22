@@ -1,12 +1,19 @@
 {
   "id": "apibay",
-  "name": "The Pirate Bay (API)",
+  "name": "The Pirate Bay",
   "type": "api",
   "urls": {
     "primary": "https://apibay.org/q.php?q={{q}}",
     "mirrors": [
       "https://tpb.party/search/{{q}}/1/99/0",
-      "https://thepiratebay10.org/search/{{q}}/1/99/0"
+      "https://thepiratebay10.xyz/search/{{q}}/1/99/0",
+      "https://thepiratebay.zone/search/{{q}}/1/99/0",
+      "https://piratebay.live/search/{{q}}/1/99/0",
+      "https://thehiddenbay.com/search/{{q}}/1/99/0",
+      "https://thepiratebay.bond/search/{{q}}/1/99/0",
+      "https://tpb.unleashed.pw/search/{{q}}/1/99/0",
+      "https://pirateproxylive.org/search/{{q}}/1/99/0",
+      "https://ukpass.co/search/{{q}}/1/99/0"
     ]
   },
   "selectors": {

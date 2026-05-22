@@ -1,7 +1,11 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import he from 'he';
+import https from 'https';
 import { ENGINE_CONFIGS } from './engines/index.js';
+
+// For TPB mirror requests: ignore self-signed / expired SSL certs on proxy sites
+const INSECURE_AGENT = new https.Agent({ rejectUnauthorized: false });
 
 const formatSize = (bytes) => {
   if (!bytes || isNaN(bytes)) return '0 B';
@@ -113,31 +117,46 @@ const engines = {
     for (const mirrorBase of config.urls.mirrors) {
         try {
             const url = mirrorBase.replace('{{q}}', encodeURIComponent(q));
-            const proxyResp = await axios.get(url, { timeout: 6000, headers: COMMON_HEADERS });
+            const proxyResp = await axios.get(url, {
+                timeout: 8000,
+                headers: COMMON_HEADERS,
+                httpsAgent: INSECURE_AGENT   // accept self-signed / expired certs on proxy sites
+            });
+            if (typeof proxyResp.data !== 'string' || proxyResp.data.length < 500) continue;
             const $ = cheerio.load(proxyResp.data);
             const results = [];
             $(config.selectors.rows).each((i, el) => {
-                if (i === 0) return;
+                if (i === 0) return; // skip header row
                 const linkEl = $(el).find(config.selectors.title).first();
                 const title = cleanTitle(linkEl.text());
                 const magnetRaw = $(el).find(config.selectors.magnet).attr('href');
                 const seeders = parseInt($(el).find(config.selectors.seeders).text()) || 0;
                 const descText = $(el).find(config.selectors.description).text();
-                const sizeMatch = descText.match(/Size\s+([\d.]+\s+[A-Z]+i?B)/i);
-                const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : null;
+
+                const sizeMatch = descText.match(/Size\s+([\d.,]+\s*[KMGTkmgt]i?B)/i);
+                const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B').trim() : null;
                 const sizeBytes = parseSizeBytes(sizeStr);
-                const dateMatch = descText.match(/Uploaded\s+([\d\s-:]+)/i);
-                const { display, timestamp } = parseDate(dateMatch ? dateMatch[1].split(',')[0] : null);
+                const dateMatch = descText.match(/Uploaded\s+([^,]+)/i);
+                const { display, timestamp } = parseDate(dateMatch ? dateMatch[1].trim() : null);
 
-                const magnetOk = typeof magnetRaw === 'string' && magnetRaw.startsWith('magnet:?xt=urn:btih:') && magnetRaw.length >= 52;
-                const titleOk  = typeof title === 'string' && title.length >= 3 && !title.startsWith('magnet:');
-                const sizeOk   = sizeStr !== null && sizeBytes > 0;
-                const dateOk   = display !== 'N/A' && timestamp > 0;
+                // Only hard-require magnet + title; size/date are optional
+                const magnetOk = typeof magnetRaw === 'string'
+                    && magnetRaw.startsWith('magnet:?xt=urn:btih:')
+                    && magnetRaw.length >= 52;
+                const titleOk = typeof title === 'string'
+                    && title.length >= 3
+                    && !title.toLowerCase().startsWith('magnet:');
 
-                if (magnetOk && titleOk && sizeOk && dateOk) {
+                if (magnetOk && titleOk) {
                     results.push({
-                        title, magnetUrl: magnetRaw + TRACKERS, size: sizeStr, sizeBytes,
-                        seeders, date: display, timestamp, source: 'PirateBay (Mirror)'
+                        title,
+                        magnetUrl: magnetRaw + TRACKERS,
+                        size: sizeStr || 'N/A',
+                        sizeBytes: sizeBytes || 0,
+                        seeders,
+                        date: display,
+                        timestamp,
+                        source: 'PirateBay (Mirror)'
                     });
                 }
             });
