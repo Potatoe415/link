@@ -92,16 +92,43 @@ function App() {
     setError(null);
     try {
       const enginesParam = selectedEngines.join(',');
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&selectedEngines=${enginesParam}`);
-      if (!response.ok) throw new Error("Search failed");
-      
-      const data = await response.json();
-      
-      if (data && !Array.isArray(data) && data.results) {
-        setResults(data.results);
-        setDebugInfo(data.debug || null);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      let response: Response;
+      try {
+        response = await fetch(`/api/search?q=${encodeURIComponent(query)}&selectedEngines=${enginesParam}`, { signal: controller.signal });
+      } catch (fetchErr: unknown) {
+        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+          setError("Request timed out after 30s. The server may be overloaded or unreachable.");
+        } else {
+          setError("Cannot reach the server. If running locally, make sure you started it with launch-windows.bat (or npm start). If on Vercel, the serverless function may have crashed.");
+        }
+        return;
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!response.ok) {
+        let detail = '';
+        try { const body = await response.json(); detail = body?.error ? ` — ${body.error}` : ''; } catch {}
+        setError(`Server returned HTTP ${response.status} ${response.statusText}${detail}.`);
+        return;
+      }
+
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        setError("Server responded but returned invalid JSON. Check the server logs.");
+        return;
+      }
+
+      if (data && typeof data === 'object' && !Array.isArray(data) && (data as { results?: unknown }).results) {
+        const d = data as { results: TorrentResult[]; debug?: DebugInfo };
+        setResults(d.results);
+        setDebugInfo(d.debug || null);
       } else if (Array.isArray(data)) {
-        setResults(data);
+        setResults(data as TorrentResult[]);
         setDebugInfo(null);
       } else {
         setResults([]);
@@ -109,7 +136,7 @@ function App() {
       }
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch results. Please make sure the local server is running.");
+      setError("Unexpected error. Check the browser console for details.");
     } finally {
       setLoading(false);
     }
