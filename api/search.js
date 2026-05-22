@@ -17,12 +17,8 @@ const formatSize = (bytes) => {
 const cleanTitle = (str) => {
   if (!str || typeof str !== 'string') return 'Unknown Title';
   try {
-      // Decode HTML entities (twice to be sure for some nested encodings)
       let decoded = he.decode(he.decode(str));
-      // Remove common garbage
-      decoded = decoded.replace(/[\n\r\t]/g, ' ')
-                       .replace(/\s\s+/g, ' ')
-                       .trim();
+      decoded = decoded.replace(/[\n\r\t]/g, ' ').replace(/\s\s+/g, ' ').trim();
       return decoded || 'Unknown Title';
   } catch (e) {
       return str.trim() || 'Unknown Title';
@@ -98,9 +94,7 @@ const engines = {
             }
         });
         return results;
-    } catch (e) {
-        return [];
-    }
+    } catch (e) { return []; }
   },
   limetorrents: async (q) => {
     try {
@@ -208,6 +202,71 @@ const engines = {
                 }
             } catch (e) {}
         }
+        return results;
+    } catch (e) { return []; }
+  },
+  torrentz2: async (q) => {
+    try {
+        const resp = await axios.get(`https://torrentz2.nz/search?q=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const $ = cheerio.load(resp.data);
+        const results = [];
+        $('div.results dl').each((i, el) => {
+            const title = cleanTitle($(el).find('dt a').text());
+            const hash = $(el).find('dt a').attr('href')?.split('/')[1];
+            const sizeStr = $(el).find('span.s').text().trim();
+            const seeders = parseInt($(el).find('span.u').text()) || 0;
+            const rawDate = $(el).find('span.d').text().trim();
+            const { display, timestamp } = formatDate(rawDate);
+            if (title && hash) {
+                results.push({
+                    title, magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}`,
+                    size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                    seeders, date: display, timestamp, source: 'Torrentz2'
+                });
+            }
+        });
+        return results;
+    } catch (e) { return []; }
+  },
+  kickass: async (q) => {
+    try {
+        const resp = await axios.get(`https://kickasstorrents.to/usearch/${encodeURIComponent(q)}/`, { timeout: 8000, headers: COMMON_HEADERS });
+        const $ = cheerio.load(resp.data);
+        const results = [];
+        $('table.data tr.odd, table.data tr.even').each((i, el) => {
+            const title = cleanTitle($(el).find('a.cellMainLink').text());
+            const magnetUrl = $(el).find('a[title="Torrent magnet link"]').attr('href');
+            const sizeStr = $(el).find('td:nth-child(2)').text().trim();
+            const rawDate = $(el).find('td:nth-child(4)').text().trim();
+            const { display, timestamp } = formatDate(rawDate);
+            const seeders = parseInt($(el).find('td:nth-child(5)').text()) || 0;
+            if (title && magnetUrl) {
+                results.push({
+                    title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
+                    seeders, date: display, timestamp, source: 'Kickass'
+                });
+            }
+        });
+        return results;
+    } catch (e) { return []; }
+  },
+  fitgirl: async (q) => {
+    try {
+        const resp = await axios.get(`https://fitgirl-repacks.site/?s=${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
+        const $ = cheerio.load(resp.data);
+        const results = [];
+        $('article').each((i, el) => {
+            const title = cleanTitle($(el).find('h1.entry-title a').text());
+            const magnetUrl = $(el).find('a[href^="magnet:"]').first().attr('href');
+            const rawDate = $(el).find('time.entry-date').attr('datetime');
+            const { display, timestamp } = formatDate(rawDate);
+            if (title && magnetUrl) {
+                results.push({
+                    title, magnetUrl, size: 'Game Repack', sizeBytes: 0,
+                    seeders: 999, date: display, timestamp, source: 'FitGirl (Games)'
+                });
+            }
+        });
         return results;
     } catch (e) { return []; }
   },

@@ -6,11 +6,14 @@ import { TorrentResult } from "./types";
 
 const ENGINES = [
   { id: 'apibay', name: 'The Pirate Bay (Apibay)' },
+  { id: '1337x', name: '1337x' },
   { id: 'limetorrents', name: 'LimeTorrents' },
   { id: 'yts', name: 'YTS (Movies)' },
   { id: 'solid', name: 'SolidTorrents' },
   { id: 'nyaa', name: 'Nyaa (Anime)' },
-  { id: '1337x', name: '1337x' },
+  { id: 'kickass', name: 'Kickass (KAT)' },
+  { id: 'torrentz2', name: 'Torrentz2' },
+  { id: 'fitgirl', name: 'FitGirl (Games)' },
   { id: 'eztv', name: 'EZTV (TV Shows)' },
   { id: 'torrent9', name: 'Torrent9 (FR)' },
   { id: 'oxtorrent', name: 'OxTorrent (FR)' },
