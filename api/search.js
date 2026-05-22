@@ -23,16 +23,27 @@ const formatDate = (dateInput) => {
     if (!dateInput) return 'N/A';
     try {
         const d = new Date(dateInput);
-        if (isNaN(d.getTime())) return dateInput; // Return raw if parsing fails
+        if (isNaN(d.getTime())) return dateInput;
         return d.toISOString().split('T')[0];
     } catch (e) {
         return dateInput;
     }
 };
 
+const COMMON_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9,fr-FR;q=0.8,fr;q=0.7',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache'
+};
+
 const engines = {
   apibay: async (q) => {
-    const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 8000 });
+    const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { 
+        timeout: 8000,
+        headers: COMMON_HEADERS
+    });
     return (Array.isArray(resp.data) ? resp.data : [])
       .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
       .map(item => {
@@ -50,7 +61,7 @@ const engines = {
   limetorrents: async (q) => {
     const resp = await axios.get(`https://www.limetorrents.to/search/all/${encodeURIComponent(q)}/`, { 
       timeout: 8000,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: COMMON_HEADERS
     });
     const $ = cheerio.load(resp.data);
     const results = [];
@@ -66,7 +77,10 @@ const engines = {
     return results;
   },
   yts: async (q) => {
-    const resp = await axios.get(`https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(q)}`, { timeout: 8000 });
+    const resp = await axios.get(`https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(q)}`, { 
+        timeout: 8000,
+        headers: COMMON_HEADERS
+    });
     if (!resp.data.data.movies) return [];
     const results = [];
     resp.data.data.movies.forEach(movie => {
@@ -85,7 +99,10 @@ const engines = {
     return results;
   },
   solid: async (q) => {
-    const resp = await axios.get(`https://solidtorrents.net/api/v1/search?q=${encodeURIComponent(q)}`, { timeout: 8000 });
+    const resp = await axios.get(`https://solidtorrents.net/api/v1/search?q=${encodeURIComponent(q)}`, { 
+        timeout: 8000,
+        headers: COMMON_HEADERS
+    });
     return (resp.data.results || []).map(item => ({
       title: cleanTitle(item.title),
       magnetUrl: item.magnet,
@@ -96,7 +113,10 @@ const engines = {
     }));
   },
   nyaa: async (q) => {
-    const resp = await axios.get(`https://nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(q)}`, { timeout: 8000 });
+    const resp = await axios.get(`https://nyaa.si/?f=0&c=0_0&q=${encodeURIComponent(q)}`, { 
+        timeout: 8000,
+        headers: COMMON_HEADERS
+    });
     const $ = cheerio.load(resp.data);
     const results = [];
     $('tr.default, tr.success, tr.danger').each((i, el) => {
@@ -110,7 +130,7 @@ const engines = {
     return results;
   },
   "1337x": async (q) => {
-    const resp = await axios.get(`https://1337x.to/search/${encodeURIComponent(q)}/1/`, { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const resp = await axios.get(`https://1337x.to/search/${encodeURIComponent(q)}/1/`, { timeout: 8000, headers: COMMON_HEADERS });
     const $ = cheerio.load(resp.data);
     const links = [];
     $('table.table-list tbody tr').each((i, el) => {
@@ -125,7 +145,7 @@ const engines = {
     const results = [];
     for (const link of links.slice(0, 3)) {
         try {
-            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').first().attr('href');
             if (magnetUrl) results.push({ ...link, magnetUrl, source: '1337x' });
@@ -134,7 +154,7 @@ const engines = {
     return results;
   },
   torrent9: async (q) => {
-    const resp = await axios.get(`https://www.torrent9.to/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const resp = await axios.get(`https://www.torrent9.to/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
     const $ = cheerio.load(resp.data);
     const detailLinks = [];
     $('table.table-hover tbody tr').each((i, el) => {
@@ -142,17 +162,14 @@ const engines = {
         const detailUrl = "https://www.torrent9.to" + $(el).find('a').attr('href');
         const size = $(el).find('td:nth-child(2)').text().trim();
         const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
-        // French sites usually don't show date in results table, or it's implied recent. 
-        // We'll mark as N/A or try to find it.
         if (title && detailUrl) detailLinks.push({ title, detailUrl, size, seeders, date: 'N/A' });
     });
     const results = [];
     for (const link of detailLinks.slice(0, 3)) {
         try {
-            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').attr('href');
-            // Try to find date in detail page
             const date = $$('.start-session').text().split(':').pop().trim() || 'N/A';
             if (magnetUrl) results.push({ ...link, magnetUrl, date, source: 'Torrent9 (FR)' });
         } catch (e) {}
@@ -160,7 +177,7 @@ const engines = {
     return results;
   },
   oxtorrent: async (q) => {
-    const resp = await axios.get(`https://www.oxtorrent.town/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const resp = await axios.get(`https://www.oxtorrent.town/recherche/${encodeURIComponent(q)}`, { timeout: 8000, headers: COMMON_HEADERS });
     const $ = cheerio.load(resp.data);
     const detailLinks = [];
     $('table.table-hover tbody tr').each((i, el) => {
@@ -173,7 +190,7 @@ const engines = {
     const results = [];
     for (const link of detailLinks.slice(0, 3)) {
         try {
-            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
             const $$ = cheerio.load(detailResp.data);
             const magnetUrl = $$('a[href^="magnet:"]').attr('href');
             const date = $$('.start-session').text().split(':').pop().trim() || 'N/A';
