@@ -230,9 +230,9 @@ function App() {
       )}
 
       {/* Floating Settings Button */}
-      <div className="fixed left-4 bottom-14 z-[110]">
+      <div className="fixed right-4 bottom-14 z-[110]">
         {showSettings && (
-          <div className="absolute bottom-full left-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="absolute bottom-full right-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
             <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Search Engines</h3>
             <div className="space-y-1 sm:space-y-2">
               {ENGINES.map(engine => (
