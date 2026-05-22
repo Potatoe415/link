@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Settings, Check, Terminal, ChevronUp, ChevronDown, Activity, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Settings, Check, Terminal, ChevronUp, ChevronDown, Activity, AlertCircle, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import SearchBar from "./components/SearchBar";
 import ResultList from "./components/ResultList";
 import { TorrentResult } from "./types";
@@ -35,6 +35,13 @@ interface DebugInfo {
 type SortOption = 'seeders' | 'size' | 'date';
 
 function App() {
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem("magnet_auth") === "true";
+  });
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState(false);
+
   const [results, setResults] = useState<TorrentResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,10 +118,58 @@ function App() {
     window.location.href = magnetUrl;
   };
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === "bob") {
+      setIsAuthenticated(true);
+      localStorage.setItem("magnet_auth", "true");
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+      setPassword("");
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 font-sans text-white">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-10 shadow-2xl text-center relative overflow-hidden">
+          {/* Subtle decoration */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
+          
+          <div className="inline-flex p-4 rounded-full bg-blue-600/10 text-blue-500 mb-6">
+            <Lock size={32} />
+          </div>
+          
+          <h1 className="text-3xl font-bold mb-2 tracking-tight">Access <span className="text-blue-500">Locked</span></h1>
+          <p className="text-slate-400 mb-8 text-sm">Please enter the security password</p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••"
+              autoFocus
+              className={`w-full px-6 py-5 bg-slate-950 border-2 rounded-2xl focus:outline-none text-white text-center text-2xl tracking-[0.5em] transition-all ${authError ? 'border-red-500/50 ring-4 ring-red-500/10' : 'border-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'}`}
+            />
+            {authError && <p className="text-red-500 text-xs font-medium">Incorrect password. Please try again.</p>}
+            <button
+              type="submit"
+              className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-lg transition-all active:scale-95 shadow-lg shadow-blue-600/20 mt-2"
+            >
+              Verify & Unlock
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-20 p-4 sm:p-8 flex flex-col items-center bg-slate-900 text-white font-sans">
       <header className="mb-8 sm:mb-12 text-center w-full max-w-2xl">
-        <h1 className="text-4xl sm:text-5xl font-bold mb-2 sm:mb-4 tracking-tight">
+        <h1 className="text-4xl sm:text-5xl font-bold mb-2 sm:mb-4 tracking-tight text-white">
           Magnet<span className="text-blue-500">Finder</span>
         </h1>
       </header>
