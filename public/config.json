@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "comment": "Configuration dynamique des indexeurs pour le backend Rust",
+  "indexers": [
+    {
+      "name": "Apibay (ThePirateBay API)",
+      "enabled": true,
+      "format": "json",
+      "search_url": "https://apibay.org/q.php?q={query}",
+      "json_mapping": {
+        "root_array": "",
+        "title": "name",
+        "info_hash": "info_hash",
+        "size": "size",
+        "seeders": "seeders"
+      },
+      "note": "Pour le format JSON d'Apibay, le magnet se construit via magnet:?xt=urn:btih:{info_hash}&dn={title}"
+    },
+    {
+      "name": "LimeTorrents (HTML Scraping)",
+      "enabled": true,
+      "format": "html",
+      "search_url": "https://www.limetorrents.to/search/all/{query}/",
+      "selectors": {
+        "row": "table.table2 tr.table-toggle",
+        "title": "div.tt-name a:nth-child(2)",
+        "magnet": "td.tdnormal:nth-of-type(3) a.csbuttons[href^='magnet:']",
+        "size": "td.tdnormal:nth-of-type(2)",
+        "seeders": "td.tdseed"
+      },
+      "note": "Séleceteurs natifs valides. Éviter 1337x dans un premier temps car il nécessite une double requête HTTP (recherche puis page de détails) pour obtenir le magnet."
+    }
+  ]
+}

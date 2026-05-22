@@ -1,0 +1,7 @@
+{
+  "identifier": "allow-search",
+  "description": "Allows the search_torrents command",
+  "commands": [
+    "search_torrents"
+  ]
+}
