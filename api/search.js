@@ -15,13 +15,13 @@ const formatSize = (bytes) => {
 };
 
 const cleanTitle = (str) => {
-  if (!str || typeof str !== 'string') return 'Unknown Title';
+  if (!str || typeof str !== 'string') return '';
   try {
       let decoded = he.decode(he.decode(str));
       decoded = decoded.replace(/[\n\r\t]/g, ' ').replace(/\s\s+/g, ' ').trim();
-      return decoded || 'Unknown Title';
+      return decoded;
   } catch (e) {
-      return str.trim() || 'Unknown Title';
+      return str.trim();
   }
 };
 
@@ -30,11 +30,9 @@ const parseDate = (dateStr) => {
     const now = new Date();
     let d = new Date(dateStr);
 
-    // If it's a number (timestamp)
     if (!isNaN(dateStr) && !isNaN(parseFloat(dateStr))) {
         d = new Date(parseInt(dateStr));
     } 
-    // Handle relative dates like "2 days ago", "5 hours ago", "1 month ago"
     else if (dateStr.toLowerCase().includes('ago')) {
         const parts = dateStr.toLowerCase().split(' ');
         const num = parseInt(parts[0]);
@@ -47,22 +45,15 @@ const parseDate = (dateStr) => {
             else if (parts[1].includes('year')) d = new Date(now.getTime() - num * 31536000000);
         }
     }
-    // Handle "today" or "yesterday"
     else if (dateStr.toLowerCase() === 'today') d = now;
     else if (dateStr.toLowerCase() === 'yesterday') d = new Date(now.getTime() - 86400000);
-    // Handle short formats like "May '24" or "May 22"
     else if (isNaN(d.getTime())) {
-        // Try to replace ' with 20 to handle '24 -> 2024
         const fixedYear = dateStr.replace(/'(\d{2})/, '20$1');
         d = new Date(fixedYear);
     }
 
     if (isNaN(d.getTime())) return { display: dateStr, timestamp: 0 };
-    
-    return { 
-        display: d.toISOString().split('T')[0], 
-        timestamp: d.getTime() 
-    };
+    return { display: d.toISOString().split('T')[0], timestamp: d.getTime() };
 };
 
 const parseSizeBytes = (sizeStr) => {
@@ -84,55 +75,71 @@ const COMMON_HEADERS = {
 
 const engines = {
   apibay: async (q) => {
+    // 1. Try official Apibay API
     try {
         const resp = await axios.get(`https://apibay.org/q.php?q=${encodeURIComponent(q)}`, { timeout: 4000, headers: COMMON_HEADERS });
         if (Array.isArray(resp.data) && resp.data.length > 0 && resp.data[0].id !== "0") {
             return resp.data
                 .filter(item => item.info_hash && item.info_hash !== '0000000000000000000000000000000000000000')
                 .map(item => {
-                    const title = cleanTitle(item.name);
+                    const title = cleanTitle(item.name) || 'Unknown TPB Item';
                     const { display, timestamp } = parseDate(item.added ? parseInt(item.added) * 1000 : null);
                     return {
                         title, magnetUrl: `magnet:?xt=urn:btih:${item.info_hash}&dn=${encodeURIComponent(title)}`,
                         size: formatSize(item.size), sizeBytes: parseInt(item.size) || 0,
-                        seeders: parseInt(item.seeders) || 0, date: display, timestamp, source: 'Apibay'
+                        seeders: parseInt(item.seeders) || 0, date: display, timestamp, source: 'PirateBay (API)'
                     };
                 });
         }
-    } catch (e) {}
+    } catch (e) {
+        console.log("Apibay API Failed");
+    }
 
+    // 2. Mirror list (Proxy Scraping)
     const mirrors = [
         'https://tpb.party',
         'https://thepiratebay10.org',
-        'https://piratebayproxy.net'
+        'https://piratebayproxy.net',
+        'https://thepiratebay.zone',
+        'https://tpb.mmo.com.co'
     ];
 
     for (const mirror of mirrors) {
         try {
             const url = `${mirror}/search/${encodeURIComponent(q)}/1/99/0`;
-            const proxyResp = await axios.get(url, { timeout: 6000, headers: COMMON_HEADERS });
+            const proxyResp = await axios.get(url, { timeout: 5000, headers: COMMON_HEADERS });
             const $ = cheerio.load(proxyResp.data);
             const results = [];
+            
             $('table#searchResult tr').each((i, el) => {
                 if (i === 0) return;
-                const linkEl = $(el).find('div.detName a');
-                const title = cleanTitle(linkEl.text());
+                
+                // Try multiple selectors for the title as proxies vary
+                const nameLink = $(el).find('div.detName a, a.detLink, td:nth-child(2) a:first-child').first();
+                const title = cleanTitle(nameLink.text());
+                
                 const magnetUrl = $(el).find('a[href^="magnet:"]').attr('href');
                 const seeders = parseInt($(el).find('td:nth-last-child(2)').text()) || 0;
-                const descText = $(el).find('font.detDesc').text();
+                const descText = $(el).find('font.detDesc, .detDesc').text();
+                
                 const sizeMatch = descText.match(/Size ([\d.]+\s+[KMG]iB)/i);
                 const sizeStr = sizeMatch ? sizeMatch[1].replace(/iB/i, 'B') : 'N/A';
+                
                 const dateMatch = descText.match(/Uploaded ([\d-]+)/i);
                 const { display, timestamp } = parseDate(dateMatch ? dateMatch[1] : null);
-                if (title && magnetUrl && title !== 'Unknown Title') {
+
+                if (title && magnetUrl && title.length > 2) {
                     results.push({
                         title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                         seeders, date: display, timestamp, source: `PirateBay (Mirror)`
                     });
                 }
             });
+
             if (results.length > 0) return results;
-        } catch (e) { continue; }
+        } catch (e) {
+            continue;
+        }
     }
     return [];
   },
@@ -148,7 +155,7 @@ const engines = {
             const rawDate = $(el).find('td.tdnormal:nth-of-type(1)').text().trim().split(' - ')[0];
             const { display, timestamp } = parseDate(rawDate);
             const seeders = parseInt($(el).find('td.tdseed').text().trim()) || 0;
-            if (title && magnetUrl && title !== 'Unknown Title') {
+            if (title && magnetUrl) {
                 results.push({ 
                     title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                     seeders, date: display, timestamp, source: 'LimeTorrents' 
@@ -202,7 +209,7 @@ const engines = {
             const rawDate = $(el).find('td:nth-child(5)').text().trim().split(' ')[0];
             const { display, timestamp } = parseDate(rawDate);
             const seeders = parseInt($(el).find('td:nth-child(6)').text().trim()) || 0;
-            if (title && magnetUrl && title !== 'Unknown Title') {
+            if (title && magnetUrl) {
                 results.push({ 
                     title, magnetUrl, size: sizeStr, sizeBytes: parseSizeBytes(sizeStr),
                     seeders, date: display, timestamp, source: 'Nyaa' 
@@ -224,7 +231,7 @@ const engines = {
             const sizeStr = $(el).find('td.coll-4.size').contents().first().text().trim();
             const rawDate = $(el).find('td.coll-date').text().trim();
             const seeders = parseInt($(el).find('td.coll-2.seeds').text().trim()) || 0;
-            if (title && detailUrl && title !== 'Unknown Title') links.push({ title, detailUrl, sizeStr, seeders, rawDate });
+            if (title && detailUrl) links.push({ title, detailUrl, sizeStr, seeders, rawDate });
         });
         const results = [];
         for (const link of links.slice(0, 3)) {
@@ -321,7 +328,7 @@ const engines = {
             const detailUrl = "https://www.torrent9.to" + linkEl.attr('href');
             const sizeStr = $(el).find('td:nth-child(2)').text().trim();
             const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
-            if (title && detailUrl && title !== 'Unknown Title') detailLinks.push({ title, detailUrl, sizeStr, seeders });
+            if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
         });
         const results = [];
         for (const link of detailLinks.slice(0, 3)) {
@@ -353,7 +360,7 @@ const engines = {
             const detailUrl = "https://www.oxtorrent.town" + linkEl.attr('href');
             const sizeStr = $(el).find('td:nth-child(2)').text().trim();
             const seeders = parseInt($(el).find('td:nth-child(3)').text().trim()) || 0;
-            if (title && detailUrl && title !== 'Unknown Title') detailLinks.push({ title, detailUrl, sizeStr, seeders });
+            if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
         });
         const results = [];
         for (const link of detailLinks.slice(0, 3)) {
@@ -362,7 +369,7 @@ const engines = {
                 const $$ = cheerio.load(detailResp.data);
                 const magnetUrl = $$('a[href^="magnet:"]').attr('href');
                 const rawDate = $$('.start-session').text().split(':').pop().trim();
-                const { display, timestamp } = formatDate(rawDate);
+                const { display, timestamp } = parseDate(rawDate);
                 if (magnetUrl) {
                     results.push({ 
                         title: link.title, magnetUrl, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
