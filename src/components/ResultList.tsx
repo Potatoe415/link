@@ -8,7 +8,7 @@ interface ResultListProps {
 }
 
 const ResultList: React.FC<ResultListProps> = ({ results, onDownload }) => {
-  if (results.length === 0) {
+  if (!results || results.length === 0) {
     return null;
   }
 
