@@ -44,17 +44,17 @@ const parseDate = (dateStr) => {
         if (relMatch) {
             const num = parseInt(relMatch[1]);
             const unit = relMatch[2];
-            if (/^y/.test(unit))   d = new Date(now.getTime() - num * 31536000000);
+            if (/^y/.test(unit))       d = new Date(now.getTime() - num * 31536000000);
             else if (/^mo/.test(unit)) d = new Date(now.getTime() - num * 2592000000);
             else if (/^w/.test(unit))  d = new Date(now.getTime() - num * 604800000);
             else if (/^d/.test(unit))  d = new Date(now.getTime() - num * 86400000);
             else if (/^h/.test(unit))  d = new Date(now.getTime() - num * 3600000);
             else if (/^mi/.test(unit)) d = new Date(now.getTime() - num * 60000);
+        } else {
+            // Try fixing short year format: '24 → 2024
+            const fixedYear = s.replace(/'(\d{2})/, '20$1');
+            d = new Date(fixedYear);
         }
-    }
-    else if (isNaN(d.getTime())) {
-        const fixedYear = s.replace(/'(\d{2})/, '20$1');
-        d = new Date(fixedYear);
     }
 
     if (isNaN(d.getTime())) return { display: dateStr, timestamp: 0 };
