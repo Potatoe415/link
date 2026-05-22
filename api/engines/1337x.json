@@ -3,8 +3,14 @@
   "name": "1337x",
   "type": "scraper",
   "urls": {
-    "primary": "https://1337x.to/search/{{q}}/1/",
-    "base": "https://1337x.to"
+    "mirrors": [
+      "https://1337x.to/search/{{q}}/1/",
+      "https://1337x.pl/search/{{q}}/1/",
+      "https://1337x.is/search/{{q}}/1/",
+      "https://www.1337x.tw/search/{{q}}/1/",
+      "https://1337x.unblockit.blue/search/{{q}}/1/",
+      "https://1337x.gd/search/{{q}}/1/"
+    ]
   },
   "selectors": {
     "rows": "table.table-list tbody tr",

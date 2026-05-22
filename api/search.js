@@ -331,37 +331,60 @@ const engines = {
   },
   "1337x": async (q) => {
     const config = ENGINE_CONFIGS['1337x'];
-    try {
-        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
-        const $ = cheerio.load(resp.data);
-        const links = [];
-        $(config.selectors.rows).each((i, el) => {
-            const nameEl = $(el).find(config.selectors.title);
-            const title = cleanTitle(nameEl.text());
-            const detailUrl = config.urls.base + nameEl.attr('href');
-            const sizeStr = $(el).find(config.selectors.size).contents().first().text().trim();
-            const rawDate = $(el).find(config.selectors.date).text().trim();
-            const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
-            if (title && detailUrl) links.push({ title, detailUrl, sizeStr, seeders, rawDate });
-        });
-        const results = [];
-        for (const link of links.slice(0, 3)) {
-            try {
-                const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
-                const $$ = cheerio.load(detailResp.data);
-                const magnetUrl = $$('a[href^="magnet:"]').first().attr('href');
-                const fullDate = $$('.list-inline li:contains("Date uploaded")').text().replace("Date uploaded", "").trim() || link.rawDate;
-                const { display, timestamp } = parseDate(fullDate);
-                if (magnetUrl) {
-                    results.push({
-                        title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
-                        seeders: link.seeders, date: display, timestamp, source: '1337x'
-                    });
-                }
-            } catch (e) {}
-        }
-        return { results, method: 'scraping' };
-    } catch (e) { return { results: [], method: 'scraping' }; }
+    const axiosOpts = { timeout: 8000, headers: COMMON_HEADERS, httpsAgent: INSECURE_AGENT };
+
+    // Try each mirror in order until one returns a proper result list
+    for (const mirrorBase of config.urls.mirrors) {
+        try {
+            const searchUrl = mirrorBase.replace('{{q}}', encodeURIComponent(q));
+            const resp = await axios.get(searchUrl, axiosOpts);
+            if (typeof resp.data !== 'string' || resp.data.length < 500) continue;
+            const $ = cheerio.load(resp.data);
+
+            // Detect bot-detection JS redirect pages
+            if (!$(config.selectors.rows).length) continue;
+
+            const links = [];
+            $(config.selectors.rows).each((i, el) => {
+                const nameEl = $(el).find(config.selectors.title);
+                const title = cleanTitle(nameEl.text());
+                const href = nameEl.attr('href');
+                if (!title || !href) return;
+                // Build detail URL using the same base as the working mirror
+                const mirrorOrigin = new URL(mirrorBase.replace('{{q}}', 'x')).origin;
+                const detailUrl = mirrorOrigin + href;
+                const sizeStr = $(el).find(config.selectors.size).contents().first().text().trim();
+                const rawDate = $(el).find(config.selectors.date).text().trim();
+                const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
+                links.push({ title, detailUrl, sizeStr, seeders, rawDate });
+            });
+
+            if (links.length === 0) continue;
+
+            // Fetch top 3 detail pages in parallel to get magnet links
+            const settled = await Promise.all(links.slice(0, 3).map(async (link) => {
+                try {
+                    const detailResp = await axios.get(link.detailUrl, { ...axiosOpts, timeout: 5000 });
+                    const $$ = cheerio.load(detailResp.data);
+                    const magnetUrl = $$('a[href^="magnet:"]').first().attr('href');
+                    const fullDate = $$('.list-inline li:contains("Date uploaded")').text().replace('Date uploaded', '').trim() || link.rawDate;
+                    const { display, timestamp } = parseDate(fullDate);
+                    if (magnetUrl) {
+                        return {
+                            title: link.title, magnetUrl: magnetUrl + TRACKERS,
+                            size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                            seeders: link.seeders, date: display, timestamp, source: '1337x'
+                        };
+                    }
+                } catch (e) {}
+                return null;
+            }));
+
+            const results = settled.filter(Boolean);
+            if (results.length > 0) return { results, method: 'scraping' };
+        } catch (e) { continue; }
+    }
+    return { results: [], method: 'scraping' };
   },
   torrentz2: async (q) => {
     const config = ENGINE_CONFIGS.torrentz2;
