@@ -22,14 +22,6 @@ const ENGINES = [
 
 const ITEMS_PER_PAGE = 50;
 
-const REGIONS = [
-  { id: 'auto', flag: '🌐', label: 'Auto',      sub: 'Default'       },
-  { id: 'iad1', flag: '🇺🇸', label: 'US East',   sub: 'Washington DC' },
-  { id: 'cdg1', flag: '🇫🇷', label: 'Paris',     sub: 'France'        },
-  { id: 'fra1', flag: '🇩🇪', label: 'Frankfurt', sub: 'Germany'       },
-  { id: 'lhr1', flag: '🇬🇧', label: 'London',    sub: 'UK'            },
-];
-
 interface DebugInfo {
   totalTime: number;
   region?: string;
@@ -58,13 +50,11 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2', 'knaben']);
-  const [region, setRegion] = useState<string>(() => localStorage.getItem('magnet_region') || 'auto');
   const [sortBy, setSortBy] = useState<SortOption>('seeders');
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
-  const [showRegion, setShowRegion] = useState(false);
   const [pendingEngines, setPendingEngines] = useState<number>(0);
 
   // Dynamic Client-side Sorting
@@ -88,11 +78,6 @@ function App() {
   useEffect(() => {
     setCurrentPage(1);
   }, [results, sortBy]);
-
-  const handleRegionChange = (id: string) => {
-    setRegion(id);
-    localStorage.setItem('magnet_region', id);
-  };
 
   const toggleEngine = (id: string) => {
     setSelectedEngines(prev => 
@@ -131,21 +116,15 @@ function App() {
     // Fetch one engine, return its results
     const fetchEngine = async (engine: string): Promise<void> => {
       const engineStart = Date.now();
-      const endpoints = region !== 'auto'
-        ? [`/api/search-${region}`, '/api/search']
-        : ['/api/search'];
-
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 30000);
       let response: Response | null = null;
-      for (const endpoint of endpoints) {
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 30000);
-        try {
-          const r = await fetch(`${endpoint}?q=${encodeURIComponent(query)}&selectedEngines=${engine}`, { signal: controller.signal });
-          clearTimeout(t);
-          if (r.ok) { response = r; break; }
-        } catch (e: unknown) {
-          clearTimeout(t);
-        }
+      try {
+        const r = await fetch(`/api/search?q=${encodeURIComponent(query)}&selectedEngines=${engine}`, { signal: controller.signal });
+        clearTimeout(t);
+        if (r.ok) response = r;
+      } catch (e: unknown) {
+        clearTimeout(t);
       }
 
       const engineMs = Date.now() - engineStart;
@@ -319,41 +298,6 @@ function App() {
         </div>
       )}
 
-      {/* Floating Region Selector */}
-      <div className="fixed right-4 bottom-28 z-[110]">
-        {showRegion && (
-          <>
-            <div className="fixed inset-0 z-[-1] cursor-default" onClick={() => setShowRegion(false)} />
-            <div className="absolute bottom-full right-0 mb-4 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-3 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
-              <h3 className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider px-1">Vercel Region</h3>
-              <div className="space-y-0.5">
-                {REGIONS.map(r => (
-                  <button
-                    key={r.id}
-                    onClick={() => { handleRegionChange(r.id); setShowRegion(false); }}
-                    className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg transition-colors ${region === r.id ? 'bg-purple-600/20 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
-                  >
-                    <span className="text-lg leading-none">{r.flag}</span>
-                    <div className="flex flex-col items-start min-w-0">
-                      <span className={`text-sm font-semibold leading-tight ${region === r.id ? 'text-white' : 'text-slate-300'}`}>{r.label}</span>
-                      <span className="text-[10px] text-slate-500 leading-tight">{r.sub}</span>
-                    </div>
-                    {region === r.id && <Check size={14} className="text-purple-400 ml-auto shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-        <button
-          onClick={() => setShowRegion(!showRegion)}
-          className={`w-12 h-12 rounded-full shadow-2xl border transition-all duration-300 flex items-center justify-center text-lg ${showRegion ? 'bg-purple-600 border-purple-500 scale-110' : 'bg-slate-800 border-slate-700 hover:border-purple-500'}`}
-          title="Select Vercel Region"
-        >
-          {REGIONS.find(r => r.id === region)?.flag ?? '🌐'}
-        </button>
-      </div>
-
       {/* Floating Settings Button & Logic */}
       <div className="fixed right-4 bottom-14 z-[110]">
         {showSettings && (
@@ -405,9 +349,9 @@ function App() {
                 {debugInfo.totalTime}ms
               </span>
             )}
-            {(debugInfo?.region || region !== 'auto') && (
-              <span className="ml-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px] sm:text-xs font-bold uppercase">
-                {debugInfo?.region || region}
+            {debugInfo?.region && (
+              <span className="ml-1 px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded text-[10px] sm:text-xs font-bold uppercase">
+                {debugInfo.region}
               </span>
             )}
           </div>
