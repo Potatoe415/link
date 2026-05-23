@@ -16,6 +16,14 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 // Delegate all search logic to the shared api/search.js handler
 app.get('/api/search', (req, res) => handler(req, res));
+// Region-specific endpoints (same handler locally, Vercel routes to correct datacenter)
+app.get('/api/search-iad1', (req, res) => handler(req, res));
+app.get('/api/search-cdg1', (req, res) => handler(req, res));
+app.get('/api/search-fra1', (req, res) => handler(req, res));
+app.get('/api/search-lhr1', (req, res) => handler(req, res));
+app.get('/api/search-sin1', (req, res) => handler(req, res));
+app.get('/api/search-syd1', (req, res) => handler(req, res));
+app.get('/api/search-hnd1', (req, res) => handler(req, res));
 
 // SPA fallback
 app.use((req, res) => {

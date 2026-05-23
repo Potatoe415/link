@@ -22,11 +22,14 @@ const ENGINES = [
 const ITEMS_PER_PAGE = 50;
 
 const REGIONS = [
-  { id: 'auto', label: '🌐 Auto', description: 'Default endpoint' },
-  { id: 'iad1', label: '🇺🇸 US (iad1)', description: 'Washington DC' },
-  { id: 'cdg1', label: '🇫🇷 Paris (cdg1)', description: 'France' },
-  { id: 'fra1', label: '🇩🇪 Frankfurt (fra1)', description: 'Germany' },
-  { id: 'lhr1', label: '🇬🇧 London (lhr1)', description: 'UK' },
+  { id: 'auto', flag: '🌐', label: 'Auto',      sub: 'Default'         },
+  { id: 'iad1', flag: '🇺🇸', label: 'US East',   sub: 'Washington DC'   },
+  { id: 'cdg1', flag: '🇫🇷', label: 'Paris',     sub: 'France'          },
+  { id: 'fra1', flag: '🇩🇪', label: 'Frankfurt', sub: 'Germany'         },
+  { id: 'lhr1', flag: '🇬🇧', label: 'London',    sub: 'UK'              },
+  { id: 'sin1', flag: '🇸🇬', label: 'Singapore', sub: 'Asia Pacific'    },
+  { id: 'syd1', flag: '🇦🇺', label: 'Sydney',    sub: 'Australia'       },
+  { id: 'hnd1', flag: '🇯🇵', label: 'Tokyo',     sub: 'Japan'           },
 ];
 
 interface DebugInfo {
@@ -63,6 +66,7 @@ function App() {
   
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
+  const [showRegion, setShowRegion] = useState(false);
 
   // Dynamic Client-side Sorting
   const sortedResults = useMemo(() => {
@@ -273,6 +277,41 @@ function App() {
         </div>
       )}
 
+      {/* Floating Region Selector */}
+      <div className="fixed right-4 bottom-28 z-[110]">
+        {showRegion && (
+          <>
+            <div className="fixed inset-0 z-[-1] cursor-default" onClick={() => setShowRegion(false)} />
+            <div className="absolute bottom-full right-0 mb-4 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-3 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <h3 className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider px-1">Vercel Region</h3>
+              <div className="space-y-0.5">
+                {REGIONS.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => { handleRegionChange(r.id); setShowRegion(false); }}
+                    className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg transition-colors ${region === r.id ? 'bg-purple-600/20 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                  >
+                    <span className="text-lg leading-none">{r.flag}</span>
+                    <div className="flex flex-col items-start min-w-0">
+                      <span className={`text-sm font-semibold leading-tight ${region === r.id ? 'text-white' : 'text-slate-300'}`}>{r.label}</span>
+                      <span className="text-[10px] text-slate-500 leading-tight">{r.sub}</span>
+                    </div>
+                    {region === r.id && <Check size={14} className="text-purple-400 ml-auto shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        <button
+          onClick={() => setShowRegion(!showRegion)}
+          className={`w-12 h-12 rounded-full shadow-2xl border transition-all duration-300 flex items-center justify-center text-lg ${showRegion ? 'bg-purple-600 border-purple-500 scale-110' : 'bg-slate-800 border-slate-700 hover:border-purple-500'}`}
+          title="Select Vercel Region"
+        >
+          {REGIONS.find(r => r.id === region)?.flag ?? '🌐'}
+        </button>
+      </div>
+
       {/* Floating Settings Button & Logic */}
       <div className="fixed right-4 bottom-14 z-[110]">
         {showSettings && (
@@ -284,20 +323,6 @@ function App() {
             />
             
             <div className="absolute bottom-full right-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
-              <h3 className="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wider">Region</h3>
-              <div className="space-y-1 mb-4">
-                {REGIONS.map(r => (
-                  <button
-                    key={r.id}
-                    onClick={() => handleRegionChange(r.id)}
-                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-700 transition-colors"
-                  >
-                    <span className={region === r.id ? 'text-white text-sm' : 'text-slate-500 text-sm'}>{r.label}</span>
-                    {region === r.id && <Check size={14} className="text-purple-400" />}
-                  </button>
-                ))}
-              </div>
-              <div className="border-t border-slate-700 pt-3 mb-3"></div>
               <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Search Engines</h3>
               <div className="space-y-1 sm:space-y-2">
                 {ENGINES.map(engine => (
