@@ -12,7 +12,6 @@
     "api/search-fra1.js": { "regions": ["fra1"] },
     "api/search-lhr1.js": { "regions": ["lhr1"] },
     "api/search-sin1.js": { "regions": ["sin1"] },
-    "api/search-syd1.js": { "regions": ["syd1"] },
     "api/search-hnd1.js": { "regions": ["hnd1"] }
   }
 }

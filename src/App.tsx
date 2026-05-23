@@ -28,7 +28,6 @@ const REGIONS = [
   { id: 'fra1', flag: '🇩🇪', label: 'Frankfurt', sub: 'Germany'         },
   { id: 'lhr1', flag: '🇬🇧', label: 'London',    sub: 'UK'              },
   { id: 'sin1', flag: '🇸🇬', label: 'Singapore', sub: 'Asia Pacific'    },
-  { id: 'syd1', flag: '🇦🇺', label: 'Sydney',    sub: 'Australia'       },
   { id: 'hnd1', flag: '🇯🇵', label: 'Tokyo',     sub: 'Japan'           },
 ];
 
