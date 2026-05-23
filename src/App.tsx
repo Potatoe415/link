@@ -108,27 +108,43 @@ function App() {
     setError(null);
     try {
       const enginesParam = selectedEngines.join(',');
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-      const endpoint = region !== 'auto' ? `/api/search-${region}` : '/api/search';
-      let response: Response;
-      try {
-        response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}&selectedEngines=${enginesParam}`, { signal: controller.signal });
-      } catch (fetchErr: unknown) {
-        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-          setError("Request timed out after 30s. The server may be overloaded or unreachable.");
-        } else {
-          setError("Cannot reach the server. If running locally, make sure you started it with launch-windows.bat (or npm start). If on Vercel, the serverless function may have crashed.");
+
+      // Build endpoint list: try selected region first, then fallback to /api/search
+      const endpoints = region !== 'auto'
+        ? [`/api/search-${region}`, '/api/search']
+        : ['/api/search'];
+
+      let response: Response | null = null;
+      let lastError = '';
+
+      for (const endpoint of endpoints) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        try {
+          const r = await fetch(`${endpoint}?q=${encodeURIComponent(query)}&selectedEngines=${enginesParam}`, { signal: controller.signal });
+          clearTimeout(timeout);
+          if (r.ok) { response = r; break; }
+          // Non-ok (404, 500…) — try next endpoint silently
+          lastError = `HTTP ${r.status}`;
+        } catch (fetchErr: unknown) {
+          clearTimeout(timeout);
+          if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+            lastError = 'timeout';
+          } else {
+            lastError = 'network error';
+          }
+          // Try next endpoint
         }
-        return;
-      } finally {
-        clearTimeout(timeout);
       }
 
-      if (!response.ok) {
-        let detail = '';
-        try { const body = await response.json(); detail = body?.error ? ` — ${body.error}` : ''; } catch {}
-        setError(`Server returned HTTP ${response.status} ${response.statusText}${detail}.`);
+      if (!response) {
+        if (lastError === 'timeout') {
+          setError("Request timed out after 30s. The server may be overloaded or unreachable.");
+        } else if (lastError === 'network error') {
+          setError("Cannot reach the server. If running locally, make sure you started it with launch-windows.bat (or npm start). If on Vercel, the serverless function may have crashed.");
+        } else {
+          setError(`All endpoints failed (last error: ${lastError}).`);
+        }
         return;
       }
 
