@@ -4,6 +4,7 @@
   "type": "scraper",
   "urls": {
     "mirrors": [
+      "https://www6.torrent9.to/recherche/{{q}}",
       "https://torrent9.mrunblock.best/recherche/{{q}}",
       "https://www4.torrent9.to/recherche/{{q}}",
       "https://torrent9.unblockproject.rest/recherche/{{q}}",
