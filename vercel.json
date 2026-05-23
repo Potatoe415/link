@@ -7,7 +7,7 @@
   ],
   "functions": {
     "api/search.js": {
-      "regions": ["fra1"]
+      "regions": ["cdg1"]
     }
   }
 }
