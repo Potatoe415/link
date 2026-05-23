@@ -64,6 +64,7 @@ function App() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
   const [showRegion, setShowRegion] = useState(false);
+  const [pendingEngines, setPendingEngines] = useState<number>(0);
 
   // Dynamic Client-side Sorting
   const sortedResults = useMemo(() => {
@@ -106,73 +107,84 @@ function App() {
 
     setLoading(true);
     setError(null);
-    try {
-      const enginesParam = selectedEngines.join(',');
+    setResults([]);
+    setDebugInfo(null);
+    setPendingEngines(selectedEngines.length);
 
-      // Build endpoint list: try selected region first, then fallback to /api/search
+    const startTime = Date.now();
+    const MIN_DISPLAY_MS = 1000;
+
+    // Shared mutable state across per-engine callbacks
+    const buffer: TorrentResult[] = [];       // holds results before first flush
+    const debugLogs: DebugInfo['logs'] = [];
+    let detectedRegion = '';
+    let flushed = false;   // true after first 1-second flush
+    let remaining = selectedEngines.length;
+
+    // After 1 second, flush buffered results to the UI
+    const flushTimer = setTimeout(() => {
+      flushed = true;
+      setResults([...buffer]);
+    }, MIN_DISPLAY_MS);
+
+    // Fetch one engine, return its results
+    const fetchEngine = async (engine: string): Promise<void> => {
+      const engineStart = Date.now();
       const endpoints = region !== 'auto'
         ? [`/api/search-${region}`, '/api/search']
         : ['/api/search'];
 
       let response: Response | null = null;
-      let lastError = '';
-
       for (const endpoint of endpoints) {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
+        const t = setTimeout(() => controller.abort(), 30000);
         try {
-          const r = await fetch(`${endpoint}?q=${encodeURIComponent(query)}&selectedEngines=${enginesParam}`, { signal: controller.signal });
-          clearTimeout(timeout);
+          const r = await fetch(`${endpoint}?q=${encodeURIComponent(query)}&selectedEngines=${engine}`, { signal: controller.signal });
+          clearTimeout(t);
           if (r.ok) { response = r; break; }
-          // Non-ok (404, 500…) — try next endpoint silently
-          lastError = `HTTP ${r.status}`;
-        } catch (fetchErr: unknown) {
-          clearTimeout(timeout);
-          if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-            lastError = 'timeout';
-          } else {
-            lastError = 'network error';
-          }
-          // Try next endpoint
+        } catch (e: unknown) {
+          clearTimeout(t);
         }
       }
+
+      const engineMs = Date.now() - engineStart;
 
       if (!response) {
-        if (lastError === 'timeout') {
-          setError("Request timed out after 30s. The server may be overloaded or unreachable.");
-        } else if (lastError === 'network error') {
-          setError("Cannot reach the server. If running locally, make sure you started it with launch-windows.bat (or npm start). If on Vercel, the serverless function may have crashed.");
-        } else {
-          setError(`All endpoints failed (last error: ${lastError}).`);
-        }
-        return;
-      }
-
-      let data: unknown;
-      try {
-        data = await response.json();
-      } catch {
-        setError("Server responded but returned invalid JSON. Check the server logs.");
-        return;
-      }
-
-      if (data && typeof data === 'object' && !Array.isArray(data) && (data as { results?: unknown }).results) {
-        const d = data as { results: TorrentResult[]; debug?: DebugInfo };
-        setResults(d.results);
-        setDebugInfo(d.debug || null);
-      } else if (Array.isArray(data)) {
-        setResults(data as TorrentResult[]);
-        setDebugInfo(null);
+        debugLogs.push({ engine, status: 'error', time: engineMs, error: 'unreachable' });
       } else {
-        setResults([]);
-        setDebugInfo(null);
+        try {
+          const data = await response.json() as { results?: TorrentResult[]; debug?: DebugInfo };
+          const newResults = data.results ?? [];
+          const log = data.debug?.logs?.[0];
+          if (log) debugLogs.push(log);
+          if (data.debug?.region) detectedRegion = data.debug.region;
+
+          if (flushed) {
+            // Past the 1-second mark — add immediately
+            setResults(prev => [...prev, ...newResults]);
+          } else {
+            // Still buffering — accumulate
+            buffer.push(...newResults);
+          }
+        } catch {
+          debugLogs.push({ engine, status: 'error', time: engineMs, error: 'invalid JSON' });
+        }
       }
-    } catch (err) {
-      console.error(err);
-      setError("Unexpected error. Check the browser console for details.");
-    } finally {
-      setLoading(false);
+
+      remaining--;
+      setPendingEngines(remaining);
+      setDebugInfo({ totalTime: Date.now() - startTime, region: detectedRegion, logs: [...debugLogs] });
+    };
+
+    await Promise.allSettled(selectedEngines.map(fetchEngine));
+
+    clearTimeout(flushTimer);
+    // If everything finished before 1s, flush now
+    if (!flushed) {
+      setResults([...buffer]);
     }
+
+    setLoading(false);
   };
 
   const handleDownload = (magnetUrl: string) => {
@@ -233,9 +245,20 @@ function App() {
 
       <SearchBar onSearch={handleSearch} isLoading={loading} />
 
+      {/* Live fetch badge */}
+      {loading && pendingEngines > 0 && (
+        <div className="mt-6 flex items-center gap-2 text-xs text-slate-400">
+          <svg className="animate-spin w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          <span>Fetching <span className="text-blue-400 font-semibold">{pendingEngines}</span> more engine{pendingEngines > 1 ? 's' : ''}…</span>
+        </div>
+      )}
+
       {/* Sorting Tabs */}
       {results.length > 0 && (
-        <div className="flex items-center gap-1 sm:gap-2 mt-8 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
+        <div className="flex items-center gap-1 sm:gap-2 mt-4 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
           {[
             { id: 'seeders', label: 'Seeders' },
             { id: 'size', label: 'Size' },
@@ -261,6 +284,11 @@ function App() {
       {!loading && results.length === 0 && !error && (
         <div className="mt-12 sm:mt-20 text-slate-500 text-center">
           <p>Start searching for movies, series, or software.</p>
+        </div>
+      )}
+      {loading && results.length === 0 && (
+        <div className="mt-12 sm:mt-20 text-slate-600 text-center text-sm">
+          <p>Waiting for first results…</p>
         </div>
       )}
 
