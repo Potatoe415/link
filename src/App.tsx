@@ -57,7 +57,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2', '1337x', 'knaben']);
+  const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2', 'knaben']);
   const [region, setRegion] = useState<string>(() => localStorage.getItem('magnet_region') || 'auto');
   const [sortBy, setSortBy] = useState<SortOption>('seeders');
   const [currentPage, setCurrentPage] = useState(1);

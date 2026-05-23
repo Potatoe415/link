@@ -339,10 +339,10 @@ const engines = {
   },
   "1337x": async (q) => {
     const config = ENGINE_CONFIGS['1337x'];
-    const axiosOpts = { timeout: 8000, headers: COMMON_HEADERS, httpsAgent: INSECURE_AGENT };
+    const axiosOpts = { timeout: 3000, headers: COMMON_HEADERS, httpsAgent: INSECURE_AGENT };
 
-    // Try each mirror in order until one returns a proper result list
-    for (const mirrorBase of config.urls.mirrors) {
+    // Try first 5 mirrors only — fail fast if blocked from Vercel
+    for (const mirrorBase of config.urls.mirrors.slice(0, 5)) {
         try {
             const searchUrl = mirrorBase.replace('{{q}}', encodeURIComponent(q));
             const resp = await axios.get(searchUrl, axiosOpts);
