@@ -82,6 +82,14 @@ const parseDate = (dateStr) => {
     return { display: d.toISOString().split('T')[0], timestamp: d.getTime() };
 };
 
+const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return 'N/A';
+    if (bytes >= 1024 ** 3) return (bytes / 1024 ** 3).toFixed(2) + ' GB';
+    if (bytes >= 1024 ** 2) return (bytes / 1024 ** 2).toFixed(2) + ' MB';
+    if (bytes >= 1024)      return (bytes / 1024).toFixed(2) + ' KB';
+    return bytes + ' B';
+};
+
 const parseSizeBytes = (sizeStr) => {
     if (!sizeStr) return 0;
     const s = sizeStr.toLowerCase().replace(/,/g, '');
@@ -532,6 +540,40 @@ const engines = {
         }
         return { results, method: 'scraping' };
     } catch (e) { return { results: [], method: 'scraping' }; }
+  },
+
+  knaben: async (q) => {
+    try {
+        const body = {
+            query: q,
+            size: 30,
+            order_by: 'seeders',
+            order_direction: 'desc',
+            hide_unsafe: true,
+            hide_xxx: false
+        };
+        const resp = await axios.post('https://api.knaben.org/v1', body, {
+            timeout: 10000,
+            headers: { ...COMMON_HEADERS, 'Content-Type': 'application/json' }
+        });
+        const items = Array.isArray(resp.data) ? resp.data : (resp.data?.hits ?? []);
+        const results = items.map(item => {
+            const magnet = item.magnetUrl || (item.hash ? `magnet:?xt=urn:btih:${item.hash.toLowerCase()}` + TRACKERS : null);
+            if (!magnet || !item.title) return null;
+            const { display, timestamp } = parseDate(item.date || '');
+            return {
+                title: cleanTitle(item.title),
+                magnetUrl: magnet,
+                size: item.bytes ? formatBytes(item.bytes) : 'N/A',
+                sizeBytes: item.bytes || 0,
+                seeders: item.seeders || 0,
+                date: display,
+                timestamp,
+                source: item.tracker || 'Knaben'
+            };
+        }).filter(Boolean);
+        return { results, method: 'api' };
+    } catch (e) { return { results: [], method: 'api' }; }
   }
 };
 

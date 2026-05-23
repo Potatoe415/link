@@ -1,0 +1,8 @@
+{
+  "id": "knaben",
+  "name": "Knaben (1337x + multi)",
+  "type": "api",
+  "urls": {
+    "primary": "https://api.knaben.org/v1"
+  }
+}

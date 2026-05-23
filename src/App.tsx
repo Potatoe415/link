@@ -17,6 +17,7 @@ const ENGINES = [
   { id: 'eztv', name: 'EZTV (TV Shows)' },
   { id: 'torrent9', name: 'Torrent9 (FR)' },
   { id: 'oxtorrent', name: 'OxTorrent (FR)' },
+  { id: 'knaben', name: 'Knaben (1337x + multi)' },
 ];
 
 const ITEMS_PER_PAGE = 50;
@@ -56,7 +57,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2', '1337x']);
+  const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2', '1337x', 'knaben']);
   const [region, setRegion] = useState<string>(() => localStorage.getItem('magnet_region') || 'auto');
   const [sortBy, setSortBy] = useState<SortOption>('seeders');
   const [currentPage, setCurrentPage] = useState(1);
