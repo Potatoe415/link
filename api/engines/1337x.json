@@ -4,6 +4,12 @@
   "type": "scraper",
   "urls": {
     "mirrors": [
+      "https://1337x.unblockninja.st/search/{{q}}/1/",
+      "https://1337x.proxyninja.org/search/{{q}}/1/",
+      "https://1337x.proxyninja.net/search/{{q}}/1/",
+      "https://1337x.torrentsbay.org/search/{{q}}/1/",
+      "https://1337x.torrentbay.st/search/{{q}}/1/",
+      "https://1337x.piratic.org/search/{{q}}/1/",
       "https://1337x-to.hashhackers.com/search/{{q}}/1/",
       "https://1337x.to/search/{{q}}/1/",
       "https://1337x.pl/search/{{q}}/1/",
