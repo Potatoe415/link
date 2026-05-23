@@ -21,6 +21,14 @@ const ENGINES = [
 
 const ITEMS_PER_PAGE = 50;
 
+const REGIONS = [
+  { id: 'auto', label: '🌐 Auto', description: 'Default endpoint' },
+  { id: 'iad1', label: '🇺🇸 US (iad1)', description: 'Washington DC' },
+  { id: 'cdg1', label: '🇫🇷 Paris (cdg1)', description: 'France' },
+  { id: 'fra1', label: '🇩🇪 Frankfurt (fra1)', description: 'Germany' },
+  { id: 'lhr1', label: '🇬🇧 London (lhr1)', description: 'UK' },
+];
+
 interface DebugInfo {
   totalTime: number;
   region?: string;
@@ -48,7 +56,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2']);
+  const [selectedEngines, setSelectedEngines] = useState<string[]>(['apibay', 'torrentz2', '1337x']);
+  const [region, setRegion] = useState<string>(() => localStorage.getItem('magnet_region') || 'auto');
   const [sortBy, setSortBy] = useState<SortOption>('seeders');
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -77,6 +86,11 @@ function App() {
     setCurrentPage(1);
   }, [results, sortBy]);
 
+  const handleRegionChange = (id: string) => {
+    setRegion(id);
+    localStorage.setItem('magnet_region', id);
+  };
+
   const toggleEngine = (id: string) => {
     setSelectedEngines(prev => 
       prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]
@@ -95,9 +109,10 @@ function App() {
       const enginesParam = selectedEngines.join(',');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
+      const endpoint = region !== 'auto' ? `/api/search-${region}` : '/api/search';
       let response: Response;
       try {
-        response = await fetch(`/api/search?q=${encodeURIComponent(query)}&selectedEngines=${enginesParam}`, { signal: controller.signal });
+        response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}&selectedEngines=${enginesParam}`, { signal: controller.signal });
       } catch (fetchErr: unknown) {
         if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
           setError("Request timed out after 30s. The server may be overloaded or unreachable.");
@@ -269,6 +284,20 @@ function App() {
             />
             
             <div className="absolute bottom-full right-0 mb-4 w-64 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-4 text-left animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <h3 className="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wider">Region</h3>
+              <div className="space-y-1 mb-4">
+                {REGIONS.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => handleRegionChange(r.id)}
+                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-slate-700 transition-colors"
+                  >
+                    <span className={region === r.id ? 'text-white text-sm' : 'text-slate-500 text-sm'}>{r.label}</span>
+                    {region === r.id && <Check size={14} className="text-purple-400" />}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-slate-700 pt-3 mb-3"></div>
               <h3 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wider">Search Engines</h3>
               <div className="space-y-1 sm:space-y-2">
                 {ENGINES.map(engine => (
@@ -309,9 +338,9 @@ function App() {
                 {debugInfo.totalTime}ms
               </span>
             )}
-            {debugInfo?.region && (
+            {(debugInfo?.region || region !== 'auto') && (
               <span className="ml-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px] sm:text-xs font-bold uppercase">
-                {debugInfo.region}
+                {debugInfo?.region || region}
               </span>
             )}
           </div>
