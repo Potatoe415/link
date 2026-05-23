@@ -4,12 +4,5 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
-  "functions": {
-    "api/search.js":      { "regions": ["cdg1"] },
-    "api/search-iad1.js": { "regions": ["iad1"] },
-    "api/search-cdg1.js": { "regions": ["cdg1"] },
-    "api/search-fra1.js": { "regions": ["fra1"] },
-    "api/search-lhr1.js": { "regions": ["lhr1"] }
-  }
+  ]
 }
