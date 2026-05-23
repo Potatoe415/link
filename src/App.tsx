@@ -23,6 +23,7 @@ const ITEMS_PER_PAGE = 50;
 
 interface DebugInfo {
   totalTime: number;
+  region?: string;
   logs: Array<{
     engine: string;
     status: 'success' | 'error';
@@ -306,6 +307,11 @@ function App() {
             {debugInfo && (
               <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 bg-slate-700 rounded text-[10px] sm:text-xs text-slate-400">
                 {debugInfo.totalTime}ms
+              </span>
+            )}
+            {debugInfo?.region && (
+              <span className="ml-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px] sm:text-xs font-bold uppercase">
+                {debugInfo.region}
               </span>
             )}
           </div>

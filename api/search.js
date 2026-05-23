@@ -556,9 +556,10 @@ export default async function handler(req, res) {
         }
       });
     const allResults = (await Promise.all(searchPromises)).flat();
+    const region = process.env.VERCEL_REGION || req.headers['x-vercel-id']?.split('::')?.[0] || 'local';
     return res.status(200).json({
       results: allResults,
-      debug: { totalTime: Date.now() - startTime, logs }
+      debug: { totalTime: Date.now() - startTime, region, logs }
     });
   } catch (err) {
     console.error('[MagnetFinder] Unhandled handler error:', err);
