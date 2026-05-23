@@ -4,11 +4,11 @@
   "type": "scraper",
   "urls": {
     "mirrors": [
-      "https://www6.torrent9.to/search_torrent/{{q}}",
-      "https://torrent9.mrunblock.best/search_torrent/{{q}}",
-      "https://www4.torrent9.to/search_torrent/{{q}}",
-      "https://torrent9.unblockproject.rest/search_torrent/{{q}}",
-      "https://www.torrent9.to/search_torrent/{{q}}"
+      "https://www6.torrent9.to/search_torrent/{{q}}.html",
+      "https://torrent9.mrunblock.best/search_torrent/{{q}}.html",
+      "https://www4.torrent9.to/search_torrent/{{q}}.html",
+      "https://torrent9.unblockproject.rest/search_torrent/{{q}}.html",
+      "https://www.torrent9.to/search_torrent/{{q}}.html"
     ]
   },
   "selectors": {
