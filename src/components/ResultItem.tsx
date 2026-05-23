@@ -41,7 +41,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, onDownload }) => {
           </span>
           <span className={`flex items-center gap-1.5 font-bold whitespace-nowrap ${getSeederColor(result.seeders)}`}>
             <Users size={13} />
-            {formatSeeders(result.seeders)} <span className="hidden xs:inline text-[10px] font-normal opacity-70">seeders</span>
+            {formatSeeders(result.seeders)}
           </span>
           <span className="bg-slate-700 px-1.5 py-0.5 rounded text-[10px] sm:text-xs truncate max-w-[80px] sm:max-w-none text-slate-300">{result.source}</span>
         </div>
