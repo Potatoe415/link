@@ -22,13 +22,11 @@ const ENGINES = [
 const ITEMS_PER_PAGE = 50;
 
 const REGIONS = [
-  { id: 'auto', flag: '🌐', label: 'Auto',      sub: 'Default'         },
-  { id: 'iad1', flag: '🇺🇸', label: 'US East',   sub: 'Washington DC'   },
-  { id: 'cdg1', flag: '🇫🇷', label: 'Paris',     sub: 'France'          },
-  { id: 'fra1', flag: '🇩🇪', label: 'Frankfurt', sub: 'Germany'         },
-  { id: 'lhr1', flag: '🇬🇧', label: 'London',    sub: 'UK'              },
-  { id: 'sin1', flag: '🇸🇬', label: 'Singapore', sub: 'Asia Pacific'    },
-  { id: 'hnd1', flag: '🇯🇵', label: 'Tokyo',     sub: 'Japan'           },
+  { id: 'auto', flag: '🌐', label: 'Auto',      sub: 'Default'       },
+  { id: 'iad1', flag: '🇺🇸', label: 'US East',   sub: 'Washington DC' },
+  { id: 'cdg1', flag: '🇫🇷', label: 'Paris',     sub: 'France'        },
+  { id: 'fra1', flag: '🇩🇪', label: 'Frankfurt', sub: 'Germany'       },
+  { id: 'lhr1', flag: '🇬🇧', label: 'London',    sub: 'UK'            },
 ];
 
 interface DebugInfo {
