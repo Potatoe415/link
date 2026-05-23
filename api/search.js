@@ -550,7 +550,8 @@ const engines = {
             order_by: 'seeders',
             order_direction: 'desc',
             hide_unsafe: true,
-            hide_xxx: false
+            hide_xxx: false,
+            trackerIds: ['1337x']
         };
         const resp = await axios.post('https://api.knaben.org/v1', body, {
             timeout: 10000,

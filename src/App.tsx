@@ -17,7 +17,7 @@ const ENGINES = [
   { id: 'eztv', name: 'EZTV (TV Shows)' },
   { id: 'torrent9', name: 'Torrent9 (FR)' },
   { id: 'oxtorrent', name: 'OxTorrent (FR)' },
-  { id: 'knaben', name: 'Knaben (1337x + multi)' },
+  { id: 'knaben', name: '1337x (via Knaben)' },
 ];
 
 const ITEMS_PER_PAGE = 50;
