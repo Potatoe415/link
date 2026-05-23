@@ -3,8 +3,12 @@
   "name": "Torrent9 (FR)",
   "type": "scraper",
   "urls": {
-    "primary": "https://www.torrent9.to/recherche/{{q}}",
-    "base": "https://www.torrent9.to"
+    "mirrors": [
+      "https://torrent9.mrunblock.best/recherche/{{q}}",
+      "https://www4.torrent9.to/recherche/{{q}}",
+      "https://torrent9.unblockproject.rest/recherche/{{q}}",
+      "https://www.torrent9.to/recherche/{{q}}"
+    ]
   },
   "selectors": {
     "rows": "table.table-hover tbody tr",

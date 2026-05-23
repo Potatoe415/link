@@ -477,36 +477,48 @@ const engines = {
   },
   torrent9: async (q) => {
     const config = ENGINE_CONFIGS.torrent9;
-    try {
-        const resp = await axios.get(config.urls.primary.replace('{{q}}', encodeURIComponent(q)), { timeout: 8000, headers: COMMON_HEADERS });
-        const $ = cheerio.load(resp.data);
-        const detailLinks = [];
-        $(config.selectors.rows).each((i, el) => {
-            const linkEl = $(el).find(config.selectors.title).first();
-            const title = cleanTitle(linkEl.text());
-            const detailUrl = config.urls.base + linkEl.attr('href');
-            const sizeStr = $(el).find(config.selectors.size).text().trim();
-            const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
-            if (title && detailUrl) detailLinks.push({ title, detailUrl, sizeStr, seeders });
-        });
-        const results = [];
-        for (const link of detailLinks.slice(0, 3)) {
-            try {
-                const detailResp = await axios.get(link.detailUrl, { timeout: 5000, headers: COMMON_HEADERS });
-                const $$ = cheerio.load(detailResp.data);
-                const magnetUrl = $$(config.selectors.magnet).attr('href');
-                const rawDate = $$('.start-session').text().split(':').pop().trim();
-                const { display, timestamp } = parseDate(rawDate);
-                if (magnetUrl) {
-                    results.push({
-                        title: link.title, magnetUrl: magnetUrl + TRACKERS, size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
-                        date: display, timestamp, seeders: link.seeders, source: 'Torrent9 (FR)'
-                    });
-                }
-            } catch (e) {}
-        }
-        return { results, method: 'scraping' };
-    } catch (e) { return { results: [], method: 'scraping' }; }
+    const axiosOpts = { timeout: 5000, headers: COMMON_HEADERS, httpsAgent: INSECURE_AGENT };
+    const mirrors = config.urls.mirrors || [];
+    for (const mirrorUrl of mirrors) {
+        try {
+            const searchUrl = mirrorUrl.replace('{{q}}', encodeURIComponent(q));
+            const mirrorBase = new URL(searchUrl).origin;
+            const resp = await axios.get(searchUrl, axiosOpts);
+            if (typeof resp.data !== 'string' || resp.data.length < 500) continue;
+            const $ = cheerio.load(resp.data);
+            const detailLinks = [];
+            $(config.selectors.rows).each((i, el) => {
+                const linkEl = $(el).find(config.selectors.title).first();
+                const title = cleanTitle(linkEl.text());
+                const href = linkEl.attr('href');
+                if (!title || !href) return;
+                const detailUrl = mirrorBase + href;
+                const sizeStr = $(el).find(config.selectors.size).text().trim();
+                const seeders = parseInt($(el).find(config.selectors.seeders).text().trim()) || 0;
+                detailLinks.push({ title, detailUrl, sizeStr, seeders });
+            });
+            if (detailLinks.length === 0) continue;
+            const results = [];
+            for (const link of detailLinks.slice(0, 3)) {
+                try {
+                    const detailResp = await axios.get(link.detailUrl, { ...axiosOpts, timeout: 5000 });
+                    const $$ = cheerio.load(detailResp.data);
+                    const magnetUrl = $$(config.selectors.magnet).attr('href');
+                    const rawDate = $$('.start-session').text().split(':').pop().trim();
+                    const { display, timestamp } = parseDate(rawDate);
+                    if (magnetUrl) {
+                        results.push({
+                            title: link.title, magnetUrl: magnetUrl + TRACKERS,
+                            size: link.sizeStr, sizeBytes: parseSizeBytes(link.sizeStr),
+                            date: display, timestamp, seeders: link.seeders, source: 'Torrent9 (FR)'
+                        });
+                    }
+                } catch (e) {}
+            }
+            if (results.length > 0) return { results, method: 'scraping' };
+        } catch (e) { continue; }
+    }
+    return { results: [], method: 'scraping' };
   },
   oxtorrent: async (q) => {
     const config = ENGINE_CONFIGS.oxtorrent;
